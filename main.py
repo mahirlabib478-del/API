@@ -15,7 +15,7 @@ API_INFO_URL = "https://skysysx.net/api/info"      # স্ট্যাটাস
 API_SUBMIT_URL = "http://skysysx.net/e/boss"       # কুকি সাবমিটের URL (আগের মতো)
 
 if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-    raise RuntimeError("BOT_TOKEN সেট করুন!")
+    raise RuntimeError("8692984075:AAFjiQ4aj1YZi8sSCLSGeVsnY0FMOQM2Onw")
 
 # ================== লগিং ==================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
