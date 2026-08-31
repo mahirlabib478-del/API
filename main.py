@@ -7,12 +7,12 @@ import requests
 from flask import Flask
 from datetime import datetime
 
-
 # ================== কনফিগারেশন ==================
 BOT_TOKEN = "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI"
 ADMIN_CHAT_ID = "8538304896"
 API_INFO_URL = "https://skysysx.net/api/info"
 API_SUBMIT_URL = "http://skysysx.net/e/boss"
+
 
 # ================== লগিং ==================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,11 +20,9 @@ logger = logging.getLogger(__name__)
 
 # ================== ফাইল পাথ ==================
 USERS_FILE = "users.json"
-PENDING_FILE = "pending_cookies.json"
 CONFIG_FILE = "config.json"
 
 # ================== গ্লোবাল ভেরিয়েবল ==================
-pending_cookies = []          # পেন্ডিং দেখানোর জন্য রাখলাম (কিন্তু কেউ যোগ করতে পারবে না)
 subscribed_users = set()
 api_status = {
     "online": False,
@@ -68,8 +66,7 @@ def save_json(filename, data):
             logger.error(f"সেভ করতে ব্যর্থ {filename}: {e}")
 
 def load_all():
-    global pending_cookies, subscribed_users, config
-    pending_cookies = load_json(PENDING_FILE, [])
+    global subscribed_users, config
     subscribed_users = set(load_json(USERS_FILE, []))
     cfg = load_json(CONFIG_FILE, {})
     for k in config:
@@ -78,7 +75,6 @@ def load_all():
     config = cfg
 
 def save_all():
-    save_json(PENDING_FILE, pending_cookies)
     save_json(USERS_FILE, list(subscribed_users))
     save_json(CONFIG_FILE, config)
 
@@ -116,10 +112,10 @@ def answer_callback(cb_id, text=None):
     except:
         pass
 
-# ================== কিবোর্ড ==================
+# ================== কিবোর্ড (শুধু স্ট্যাটাস ও অ্যাডমিন) ==================
 def get_main_keyboard(chat_id):
     kb = [
-        ["📊 API স্ট্যাটাস", "⏳ পেন্ডিং দেখুন"]
+        ["📊 API স্ট্যাটাস"]
     ]
     if str(chat_id) == ADMIN_CHAT_ID:
         kb.append(["⚙️ অ্যাডমিন প্যানেল"])
@@ -218,7 +214,6 @@ def get_status_text():
         lines.append(f"💧 ড্রিপ রেট: {s['staging_drip_rate']}")
         lines.append(f"🔄 অটো রিলিজ: {'চালু' if s['staging_auto_release'] else 'বন্ধ'}")
     
-    lines.append(f"\n⏳ পেন্ডিং কুকি: {len(pending_cookies)} টি")
     lines.append(f"🕒 শেষ চেক: {datetime.fromtimestamp(last_check_time).strftime('%H:%M:%S')}")
     
     return "\n".join(lines)
@@ -230,9 +225,8 @@ def handle_start(chat_id):
         save_all()
     send_telegram_message(
         "📊 **API মনিটর বটে স্বাগতম!**\n\n"
-        "এই বট শুধু স্কাইসিস্ক্স API-র স্ট্যাটাস দেখানোর জন্য।\n"
-        "কুকি সাবমিট করার অপশন বন্ধ করা হয়েছে।\n\n"
-        "📊 স্ট্যাটাস দেখতে নিচের বাটন ব্যবহার করুন।",
+        "এই বট স্কাইসিস্ক্স API-র রিয়েল টাইম স্ট্যাটাস দেখায়।\n"
+        "নিচের বাটনে চেপে API অনলাইন/অফলাইন ও পরিসংখ্যান দেখুন।",
         chat_id,
         reply_markup=get_main_keyboard(chat_id),
         parse_mode="Markdown"
@@ -242,20 +236,6 @@ def handle_status(chat_id):
     fetch_api_status()
     text = get_status_text()
     send_telegram_message(text, chat_id, parse_mode="Markdown")
-
-def handle_pending_list(chat_id):
-    if not pending_cookies:
-        send_telegram_message("📭 কোনো পেন্ডিং কুকি নেই।", chat_id)
-        return
-    items = pending_cookies[:5]
-    lines = ["⏳ **পেন্ডিং কুকি লিস্ট** (সর্বশেষ ৫টি):\n"]
-    for item in items:
-        user = item["user_id"]
-        time_str = datetime.fromtimestamp(item["timestamp"]).strftime("%d/%m %H:%M")
-        lines.append(f"🆔 {item['id']} | ইউজার: {user} | {time_str}")
-    if len(pending_cookies) > 5:
-        lines.append(f"\n... এবং আরও {len(pending_cookies)-5} টি।")
-    send_telegram_message("\n".join(lines), chat_id, parse_mode="Markdown")
 
 # ================== অ্যাডমিন কমান্ড ==================
 def admin_stats(chat_id):
@@ -321,10 +301,6 @@ def process_update(update):
             handle_status(chat_id)
             return
 
-        if text == "⏳ পেন্ডিং দেখুন":
-            handle_pending_list(chat_id)
-            return
-
         if text == "⚙️ অ্যাডমিন প্যানেল" and chat_id == ADMIN_CHAT_ID:
             admin_stats(chat_id)
             return
@@ -348,7 +324,7 @@ def process_update(update):
         # ===== অচেনা টেক্সট =====
         if text:
             send_telegram_message(
-                "❌ এই বট শুধু স্ট্যাটাস দেখানোর জন্য। কুকি সাবমিট করার অপশন বন্ধ করা হয়েছে।",
+                "❌ এই বট শুধু স্ট্যাটাস দেখানোর জন্য। কোনো কুকি সাবমিট বা পেন্ডিং দেখার অপশন নেই।",
                 chat_id,
                 reply_markup=get_main_keyboard(chat_id)
             )
