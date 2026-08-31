@@ -9,16 +9,10 @@ from flask import Flask
 from datetime import datetime
 
 # ================== কনফিগারেশন ==================
-BOT_TOKEN = os.environ.get("8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI")
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable not set!")
-
-ADMIN_CHAT_ID = os.environ.get("8538304896")
-if not ADMIN_CHAT_ID:
-    raise RuntimeError("ADMIN_CHAT_ID environment variable not set!")
-
+BOT_TOKEN = "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI"
+ADMIN_CHAT_ID = "8538304896"
 API_INFO_URL = "https://skysysx.net/api/info"
-API_SUBMIT_URL = "http://skysysx.net/e/boss"  # রাখলাম, কিন্তু ব্যবহার হবে না (শুধু কাঠামোর জন্য)
+API_SUBMIT_URL = "http://skysysx.net/e/boss"
 
 # ================== লগিং ==================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
