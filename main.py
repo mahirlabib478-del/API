@@ -37,7 +37,7 @@ subscribed_users = set()
 user_sessions = {}
 credentials = []
 withdraw_requests = []
-created_accounts = []
+created_accounts = []  # status: pending/approved/rejected
 config = {
     "base_balance": 10.0,
     "channel_id": CHANNEL_ID,
@@ -47,13 +47,13 @@ config = {
                      "2️⃣ Enter your Instagram username.\n"
                      "3️⃣ Enter 2FA code if required.\n"
                      "4️⃣ Follow 5 profiles and set profile picture.\n"
-                     "5️⃣ Upon completion, your balance will be credited.",
+                     "5️⃣ Upon completion, your account will be sent for admin approval.",
     "work_rules_bn": "📱 **Instagram অ্যাকাউন্ট খোলার নিয়মাবলী**\n\n"
                      "1️⃣ আপনি একটি ইমেইল ও পাসওয়ার্ড পাবেন।\n"
                      "2️⃣ আপনার Instagram ইউজারনেম দিন।\n"
                      "3️⃣ 2FA কোড দিন (যদি থাকে)।\n"
                      "4️⃣ ৫টি প্রোফাইল ফলো করুন ও প্রোফাইল পিক সেট করুন।\n"
-                     "5️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে।"
+                     "5️⃣ সম্পন্ন হলে আপনার অ্যাকাউন্ট অ্যাডমিন অনুমোদনের জন্য জমা হবে।"
 }
 user_balances = {}
 user_info = {}
@@ -212,7 +212,7 @@ def t(key, user_id, **kwargs):
             "twofa_prompt": "🔐 **Please enter your 2FA code:**",
             "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles & set profile picture**. Have you done that?",
             "follow_yes": "⚠️ **Please follow 5 profiles & set profile picture** then press **Yes**.",
-            "completed": "🎉 **Congratulations! Account opening completed!**\n\n👤 **Username:** `{username}`\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** BDT added to your balance.",
+            "completed": "🎉 **Account opening completed!**\n\n👤 **Username:** `{username}`\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n⏳ **Your account is now pending admin approval. You will receive balance once approved.**",
             "no_accounts": "❌ **No available accounts!** Please contact admin.",
             "active_session": "⏳ You already have an active session. Please finish or cancel it.",
             "under_maintenance": "🔧 **Bot is under maintenance. Please try later.**",
@@ -229,7 +229,7 @@ def t(key, user_id, **kwargs):
             "account_list": "📋 **Account List** (Page {page}/{total_pages})\n\n",
             "account_item": "`{email}` | `{password}` | {status}",
             "deleted_all": "🗑️ **{count} accounts deleted.**",
-            "stats": "📊 **Statistics**\n\n👥 Users: {users}\n📦 Credentials: {total} (Used: {used})\n💸 Pending Withdraw: {pending}\n💰 Price per account: {price} BDT",
+            "stats": "📊 **Statistics**\n\n👥 Users: {users}\n📦 Credentials: {total} (Used: {used})\n💸 Pending Withdraw: {pending}\n💰 Price per account: {price} BDT\n⏳ Pending Approvals: {pending_acc}",
             "no_pending": "📭 **No pending withdraw requests.**",
             "pending_withdraws": "📥 **Pending Withdraw Requests**\n\n",
             "pending_item": "🆔 `{id}`\n👤 User: `{user}`\n💰 Amount: `{amount}` BDT\n💳 Method: {method}\n📞 Account: `{account}`\n🕒 Time: {time}\n",
@@ -243,9 +243,14 @@ def t(key, user_id, **kwargs):
             "restore_completed": "✅ **Restore completed!**",
             "backup_creating": "⏳ **Creating backup...**",
             "restoring": "⏳ **Restoring data...**",
-            "created_accounts_list": "📁 **Created Accounts** (Page {page}/{total_pages})\n\n",
-            "created_account_item": "👤 {username} | 📧 {email} | 🔑 {password} | 🔐 {twofa} | 👤 {user_id} | 🕒 {time}",
-            "created_accounts_empty": "📭 **No created accounts yet.**",
+            "pending_approvals_list": "⏳ **Pending Approvals** (Page {page}/{total_pages})\n\n",
+            "pending_approval_item": "🆔 `{id}` | 👤 User: `{user}` | 👤 Username: `{username}` | 📧 {email} | 🕒 {time}\n",
+            "no_pending_approvals": "📭 **No pending approvals.**",
+            "upload_approved_prompt": "📤 **Upload Approved List**\n\nSend a text file (.txt) or type the list of usernames (one per line) that you want to approve.\nType /cancel to abort.",
+            "upload_rejected_prompt": "📤 **Upload Rejected List**\n\nSend a text file (.txt) or type the list of usernames (one per line) that you want to reject.\nType /cancel to abort.",
+            "upload_approved_summary": "✅ **Approved List Processing Complete**\n\n✅ Approved: {approved}\n❌ Not Found: {not_found}\n⚠️ Already Processed: {already}",
+            "upload_rejected_summary": "❌ **Rejected List Processing Complete**\n\n❌ Rejected: {rejected}\n❌ Not Found: {not_found}\n⚠️ Already Processed: {already}",
+            "upload_no_usernames": "⚠️ No valid usernames found in the list.",
             "export_excel": "📥 **Export Excel**\n\nClick below to download all created accounts as Excel file.",
             "excel_exported": "✅ **Excel file exported!**",
         },
@@ -263,7 +268,7 @@ def t(key, user_id, **kwargs):
             "twofa_prompt": "🔐 **2FA কোড দিন:**",
             "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
             "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
-            "completed": "🎉 **অভিনন্দন! অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n👤 **ইউজারনেম:** `{username}`\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।",
+            "completed": "🎉 **অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n👤 **ইউজারনেম:** `{username}`\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n⏳ **আপনার অ্যাকাউন্টটি এখন অ্যাডমিন অনুমোদনের অপেক্ষায়। অনুমোদন পেলে ব্যালেন্স যোগ হবে।**",
             "no_accounts": "❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!** অ্যাডমিনের সাথে যোগাযোগ করুন।",
             "active_session": "⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।",
             "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
@@ -280,7 +285,7 @@ def t(key, user_id, **kwargs):
             "account_list": "📋 **অ্যাকাউন্ট লিস্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
             "account_item": "`{email}` | `{password}` | {status}",
             "deleted_all": "🗑️ **{count} টি অ্যাকাউন্ট ডিলিট করা হয়েছে।**",
-            "stats": "📊 **পরিসংখ্যান**\n\n👥 ইউজার: {users}\n📦 ক্রেডেনশিয়াল: {total} (ব্যবহৃত: {used})\n💸 পেন্ডিং উইথড্র: {pending}\n💰 প্রতি অ্যাকাউন্ট মূল্য: {price} টাকা",
+            "stats": "📊 **পরিসংখ্যান**\n\n👥 ইউজার: {users}\n📦 ক্রেডেনশিয়াল: {total} (ব্যবহৃত: {used})\n💸 পেন্ডিং উইথড্র: {pending}\n💰 প্রতি অ্যাকাউন্ট মূল্য: {price} টাকা\n⏳ পেন্ডিং অ্যাপ্রুভাল: {pending_acc}",
             "no_pending": "📭 **কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই।**",
             "pending_withdraws": "📥 **পেন্ডিং উইথড্র রিকোয়েস্ট**\n\n",
             "pending_item": "🆔 `{id}`\n👤 ইউজার: `{user}`\n💰 পরিমাণ: `{amount}` টাকা\n💳 মাধ্যম: {method}\n📞 অ্যাকাউন্ট: `{account}`\n🕒 সময়: {time}\n",
@@ -294,9 +299,14 @@ def t(key, user_id, **kwargs):
             "restore_completed": "✅ **রিস্টোর সম্পন্ন!**",
             "backup_creating": "⏳ **ব্যাকআপ নেওয়া হচ্ছে...**",
             "restoring": "⏳ **ডেটা রিস্টোর করা হচ্ছে...**",
-            "created_accounts_list": "📁 **তৈরি করা অ্যাকাউন্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
-            "created_account_item": "👤 {username} | 📧 {email} | 🔑 {password} | 🔐 {twofa} | 👤 {user_id} | 🕒 {time}",
-            "created_accounts_empty": "📭 **এখনো কোনো অ্যাকাউন্ট তৈরি হয়নি।**",
+            "pending_approvals_list": "⏳ **পেন্ডিং অ্যাপ্রুভাল** (পৃষ্ঠা {page}/{total_pages})\n\n",
+            "pending_approval_item": "🆔 `{id}` | 👤 ইউজার: `{user}` | 👤 ইউজারনেম: `{username}` | 📧 {email} | 🕒 {time}\n",
+            "no_pending_approvals": "📭 **কোনো পেন্ডিং অ্যাপ্রুভাল নেই।**",
+            "upload_approved_prompt": "📤 **অ্যাপ্রুভড লিস্ট আপলোড**\n\nএকটি টেক্সট ফাইল (.txt) আপলোড করুন অথবা ইউজারনেমের তালিকা টাইপ করুন (প্রতি লাইনে একটি) যাদের অ্যাপ্রুভ করতে চান।\nবাতিল করতে /cancel লিখুন।",
+            "upload_rejected_prompt": "📤 **রিজেক্টেড লিস্ট আপলোড**\n\nএকটি টেক্সট ফাইল (.txt) আপলোড করুন অথবা ইউজারনেমের তালিকা টাইপ করুন (প্রতি লাইনে একটি) যাদের রিজেক্ট করতে চান।\nবাতিল করতে /cancel লিখুন।",
+            "upload_approved_summary": "✅ **অ্যাপ্রুভড লিস্ট প্রসেসিং সম্পন্ন**\n\n✅ অ্যাপ্রুভড: {approved}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
+            "upload_rejected_summary": "❌ **রিজেক্টেড লিস্ট প্রসেসিং সম্পন্ন**\n\n❌ রিজেক্টেড: {rejected}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
+            "upload_no_usernames": "⚠️ তালিকায় কোনো বৈধ ইউজারনেম পাওয়া যায়নি।",
             "export_excel": "📥 **এক্সেল এক্সপোর্ট**\n\nনিচের বাটনে ক্লিক করে সব অ্যাকাউন্টের Excel ফাইল ডাউনলোড করুন।",
             "excel_exported": "✅ **Excel ফাইল তৈরি হয়েছে!**",
         }
@@ -350,7 +360,8 @@ def admin_keyboard():
             ["💲 Set Price", "📝 Edit Rules"],
             ["📥 Withdraw Requests", "📁 Backup"],
             ["📥 Restore", f"🔧 Maintenance {maint_status}"],
-            ["📥 Export Excel"],   # 👈 Created Accounts button removed, only Export Excel remains
+            ["📋 Pending Approvals", "📥 Export Excel"],
+            ["📤 Upload Approved", "📤 Upload Rejected"],
             ["🔙 Main Menu"]
         ],
         "resize_keyboard": True
@@ -445,29 +456,155 @@ def delete_credential_by_index(index):
 # ================== CREATED ACCOUNTS MANAGEMENT ==================
 def save_created_account(username, email, password, twofa, user_id):
     with data_lock:
+        acc_id = uuid.uuid4().hex[:10]
         created_accounts.append({
+            "id": acc_id,
             "username": username,
             "email": email,
             "password": password,
             "twofa": twofa,
             "user_id": str(user_id),
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "status": "pending"
         })
         save_json(CREATED_ACCOUNTS_FILE, created_accounts)
     trigger_backup()
+    return acc_id
 
+def approve_account(acc_id):
+    with data_lock:
+        for acc in created_accounts:
+            if acc.get("id") == acc_id and acc.get("status") == "pending":
+                acc["status"] = "approved"
+                user_id = acc["user_id"]
+                price = config.get("base_balance", 10.0)
+                add_balance(user_id, price)
+                uid = str(user_id)
+                if uid in user_info:
+                    user_info[uid]["total_accounts"] = user_info[uid].get("total_accounts", 0) + 1
+                else:
+                    user_info[uid] = {"name": f"User_{user_id}", "total_accounts": 1}
+                save_json(USER_INFO_FILE, user_info)
+                save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+                send_message(
+                    f"✅ Your account (Username: {acc['username']}) has been approved! {price} BDT added to your balance.",
+                    user_id
+                )
+                return True
+    return False
+
+def reject_account(acc_id):
+    with data_lock:
+        for acc in created_accounts:
+            if acc.get("id") == acc_id and acc.get("status") == "pending":
+                acc["status"] = "rejected"
+                save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+                user_id = acc["user_id"]
+                send_message(
+                    f"❌ Your account (Username: {acc['username']}) has been rejected. Please contact admin for details.",
+                    user_id
+                )
+                return True
+    return False
+
+# ================== BULK PROCESSING FROM LIST ==================
+def process_approve_list(usernames):
+    approved = 0
+    not_found = 0
+    already = 0
+    price = config.get("base_balance", 10.0)
+    with data_lock:
+        for username in usernames:
+            username = username.strip()
+            if not username:
+                continue
+            # find pending account with this username
+            found = False
+            for acc in created_accounts:
+                if acc.get("username") == username and acc.get("status") == "pending":
+                    acc["status"] = "approved"
+                    user_id = acc["user_id"]
+                    add_balance(user_id, price)
+                    uid = str(user_id)
+                    if uid in user_info:
+                        user_info[uid]["total_accounts"] = user_info[uid].get("total_accounts", 0) + 1
+                    else:
+                        user_info[uid] = {"name": f"User_{user_id}", "total_accounts": 1}
+                    send_message(
+                        f"✅ Your account (Username: {username}) has been approved! {price} BDT added to your balance.",
+                        user_id
+                    )
+                    approved += 1
+                    found = True
+                    break
+            if not found:
+                # Check if already processed
+                already_exists = any(acc.get("username") == username and acc.get("status") != "pending" for acc in created_accounts)
+                if already_exists:
+                    already += 1
+                else:
+                    not_found += 1
+        save_json(USER_INFO_FILE, user_info)
+        save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+    return approved, not_found, already
+
+def process_reject_list(usernames):
+    rejected = 0
+    not_found = 0
+    already = 0
+    with data_lock:
+        for username in usernames:
+            username = username.strip()
+            if not username:
+                continue
+            found = False
+            for acc in created_accounts:
+                if acc.get("username") == username and acc.get("status") == "pending":
+                    acc["status"] = "rejected"
+                    user_id = acc["user_id"]
+                    send_message(
+                        f"❌ Your account (Username: {username}) has been rejected. Please contact admin.",
+                        user_id
+                    )
+                    rejected += 1
+                    found = True
+                    break
+            if not found:
+                already_exists = any(acc.get("username") == username and acc.get("status") != "pending" for acc in created_accounts)
+                if already_exists:
+                    already += 1
+                else:
+                    not_found += 1
+        save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+    return rejected, not_found, already
+
+def parse_username_list(text):
+    lines = text.strip().splitlines()
+    usernames = [line.strip() for line in lines if line.strip()]
+    return usernames
+
+# ================== EXCEL GENERATION ==================
 def generate_created_accounts_excel():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Created Accounts"
-    headers = ["Username", "Email", "Password", "2FA", "User ID", "Timestamp"]
+    headers = ["ID", "Username", "Email", "Password", "2FA", "User ID", "Status", "Timestamp"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center")
     for acc in created_accounts:
         time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
-        ws.append([acc["username"], acc["email"], acc["password"], acc["twofa"], acc["user_id"], time_str])
+        ws.append([
+            acc.get("id", "N/A"),
+            acc.get("username", "N/A"),
+            acc.get("email", "N/A"),
+            acc.get("password", "N/A"),
+            acc.get("twofa", "N/A"),
+            acc.get("user_id", "N/A"),
+            acc.get("status", "N/A"),
+            time_str
+        ])
     for col in ws.columns:
         max_length = 0
         for cell in col:
@@ -861,14 +998,15 @@ def admin_stats(chat_id):
     total_creds = len(credentials)
     used_creds = len([c for c in credentials if c.get("used", False)])
     pending_withdraw = len([w for w in withdraw_requests if w["status"] == "pending"])
-    total_created = len(created_accounts)
+    pending_acc = len([a for a in created_accounts if a.get("status") == "pending"])
     send_message(
         t("stats", chat_id,
           users=len(subscribed_users),
           total=total_creds,
           used=used_creds,
           pending=pending_withdraw,
-          price=config.get("base_balance", 10.0)) + f"\n📁 Created Accounts: {total_created}",
+          price=config.get("base_balance", 10.0),
+          pending_acc=pending_acc),
         chat_id, reply_markup=admin_keyboard()
     )
 
@@ -1009,6 +1147,47 @@ def process_restore_file(chat_id, file_content):
         send_message("❌ Restore failed. Invalid file format.", chat_id, reply_markup=admin_keyboard())
     clear_session(chat_id)
 
+# ================== PENDING APPROVALS (VIEW-ONLY) ==================
+def admin_show_pending_approvals(chat_id, page=0, message_id=None):
+    pending = [acc for acc in created_accounts if acc.get("status") == "pending"]
+    if not pending:
+        send_message(t("no_pending_approvals", chat_id), chat_id, reply_markup=admin_keyboard())
+        return
+
+    per_page = 10
+    total = len(pending)
+    total_pages = (total + per_page - 1) // per_page
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    end = min(start + per_page, total)
+    page_items = pending[start:end]
+
+    lang = get_lang(chat_id)
+    msg = t("pending_approvals_list", chat_id, page=page+1, total_pages=total_pages)
+    for acc in page_items:
+        time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%d/%m %H:%M")
+        msg += t("pending_approval_item", chat_id,
+                 id=acc.get("id", "N/A"),
+                 user=acc.get("user_id", "N/A"),
+                 username=acc.get("username", "N/A"),
+                 email=acc.get("email", "N/A"),
+                 time=time_str)
+
+    kb = {"inline_keyboard": []}
+    nav = []
+    if page > 0:
+        nav.append({"text": "⬅️ Previous" if lang == "en" else "⬅️ আগের", "callback_data": f"papage_{page-1}"})
+    if page < total_pages - 1:
+        nav.append({"text": "Next ➡️" if lang == "en" else "পরের ➡️", "callback_data": f"papage_{page+1}"})
+    if nav:
+        kb["inline_keyboard"].append(nav)
+    kb["inline_keyboard"].append([{"text": "🔙 Close" if lang == "en" else "🔙 বন্ধ", "callback_data": "close_papprovals"}])
+
+    if message_id:
+        edit_message_text(chat_id, message_id, msg, reply_markup=kb)
+    else:
+        send_message(msg, chat_id, reply_markup=kb)
+
 def admin_export_excel(chat_id):
     if not created_accounts:
         send_message("📭 No accounts to export.", chat_id, reply_markup=admin_keyboard())
@@ -1023,6 +1202,36 @@ def admin_export_excel(chat_id):
     except Exception as e:
         logger.error(f"Excel export error: {e}")
         send_message("❌ Error generating Excel.", chat_id)
+
+# ================== UPLOAD LISTS HANDLERS ==================
+def admin_upload_approved_prompt(chat_id):
+    set_session(chat_id, {"upload_mode": "approved"})
+    send_message(t("upload_approved_prompt", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
+
+def admin_upload_rejected_prompt(chat_id):
+    set_session(chat_id, {"upload_mode": "rejected"})
+    send_message(t("upload_rejected_prompt", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
+
+def process_uploaded_list(chat_id, text_or_file_content):
+    session = get_session(chat_id)
+    if not session or session.get("upload_mode") not in ["approved", "rejected"]:
+        return False
+    mode = session["upload_mode"]
+    usernames = parse_username_list(text_or_file_content)
+    if not usernames:
+        send_message(t("upload_no_usernames", chat_id), chat_id)
+        return True
+
+    if mode == "approved":
+        approved, not_found, already = process_approve_list(usernames)
+        summary = t("upload_approved_summary", chat_id, approved=approved, not_found=not_found, already=already)
+    else:
+        rejected, not_found, already = process_reject_list(usernames)
+        summary = t("upload_rejected_summary", chat_id, rejected=rejected, not_found=not_found, already=already)
+
+    send_message(summary, chat_id, reply_markup=admin_keyboard())
+    clear_session(chat_id)
+    return True
 
 # ================== USER COMMANDS ==================
 def start_command(chat_id, chat_type="private"):
@@ -1115,12 +1324,6 @@ def process_follow_yes(chat_id):
         return
     session["step"] = "done"
     set_session(chat_id, session)
-    price = config.get("base_balance", 10.0)
-    add_balance(chat_id, price)
-    uid = str(chat_id)
-    if uid in user_info:
-        user_info[uid]["total_accounts"] = user_info[uid].get("total_accounts", 0) + 1
-        save_json(USER_INFO_FILE, user_info)
     username = session.get("username", "N/A")
     twofa = session.get("twofa", "N/A")
     save_created_account(username, session["email"], session["password"], twofa, chat_id)
@@ -1129,8 +1332,7 @@ def process_follow_yes(chat_id):
           username=username,
           email=session['email'],
           password=session['password'],
-          twofa=twofa,
-          price=price),
+          twofa=twofa),
         chat_id, reply_markup=next_or_cancel_keyboard(chat_id)
     )
     clear_session(chat_id)
@@ -1239,6 +1441,7 @@ def process_update(update):
         # ===== ADMIN SECTION =====
         if chat_id == ADMIN_CHAT_ID:
             session = get_session(chat_id)
+            # Handle restore mode
             if session and session.get("restore_mode"):
                 if text == "❌ Cancel" or text == "❌ বাতিল":
                     clear_session(chat_id)
@@ -1264,6 +1467,38 @@ def process_update(update):
                         send_message("❌ Please upload a `.json.gz` file.", chat_id)
                     return
 
+            # Handle upload list mode (approved/rejected)
+            if session and session.get("upload_mode") in ["approved", "rejected"]:
+                if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
+                    clear_session(chat_id)
+                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                    return
+                # If it's a document, download content
+                if "document" in msg:
+                    file_obj = msg["document"]
+                    if file_obj.get("mime_type") == "text/plain" or file_obj.get("file_name", "").endswith(".txt"):
+                        try:
+                            file_id = file_obj["file_id"]
+                            file_info = requests.get(
+                                f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+                            ).json()
+                            file_path = file_info["result"]["file_path"]
+                            file_content = requests.get(
+                                f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+                            ).text
+                            process_uploaded_list(chat_id, file_content)
+                        except Exception as e:
+                            logger.error(f"File read error: {e}")
+                            send_message("❌ Failed to read file. Please send a valid text file.", chat_id)
+                    else:
+                        send_message("❌ Please upload a .txt file or send the list as text.", chat_id)
+                    return
+                else:
+                    # Assume text is the list
+                    process_uploaded_list(chat_id, text)
+                    return
+
+            # Admin normal commands
             if chat_id in admin_cred_upload_session:
                 if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
                     del admin_cred_upload_session[chat_id]
@@ -1309,8 +1544,17 @@ def process_update(update):
             if text.startswith("🔧 Maintenance"):
                 admin_toggle_maintenance(chat_id)
                 return
-            if text == "📥 Export Excel":   # 👈 Keep Export Excel handler
+            if text == "📋 Pending Approvals":
+                admin_show_pending_approvals(chat_id)
+                return
+            if text == "📥 Export Excel":
                 admin_export_excel(chat_id)
+                return
+            if text == "📤 Upload Approved":
+                admin_upload_approved_prompt(chat_id)
+                return
+            if text == "📤 Upload Rejected":
+                admin_upload_rejected_prompt(chat_id)
                 return
             if text == "🔙 Main Menu":
                 send_message("Main Menu", chat_id, reply_markup=main_keyboard(chat_id))
@@ -1432,15 +1676,13 @@ def process_update(update):
             lang = get_lang(chat_id)
             msg = "📋 Withdraw list closed." if lang == "en" else "📋 উইথড্র তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
-        elif data.startswith("capage_"):
-            # Keep handler for any remaining callback, but the button is removed; still safe
+        elif data.startswith("papage_"):
             page = int(data.split("_")[1])
-            # Optionally handle if needed; but we can ignore
-            pass
-        elif data == "close_calist":
+            admin_show_pending_approvals(chat_id, page=page, message_id=message_id)
+        elif data == "close_papprovals":
             delete_message(chat_id, message_id)
             lang = get_lang(chat_id)
-            msg = "📁 Created accounts list closed." if lang == "en" else "📁 তৈরি অ্যাকাউন্টের তালিকা বন্ধ করা হয়েছে।"
+            msg = "📋 Pending approvals list closed." if lang == "en" else "📋 পেন্ডিং অ্যাপ্রুভাল তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
 
 # ================== FLASK ==================
