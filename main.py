@@ -9,13 +9,16 @@ from flask import Flask
 from datetime import datetime
 
 # ================== কনফিগারেশন ==================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI")
-ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "8538304896")
-API_INFO_URL = "https://skysysx.net/api/info"      # স্ট্যাটাস চেকের URL
-API_SUBMIT_URL = "http://skysysx.net/e/boss"       # কুকি সাবমিটের URL (আগের মতো)
+BOT_TOKEN = os.environ.get("8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI")
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN environment variable not set!")
 
-if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-     raise RuntimeError("BOT_TOKEN সেট করুন!")
+ADMIN_CHAT_ID = os.environ.get("8538304896")
+if not ADMIN_CHAT_ID:
+    raise RuntimeError("ADMIN_CHAT_ID environment variable not set!")
+
+API_INFO_URL = "https://skysysx.net/api/info"
+API_SUBMIT_URL = "http://skysysx.net/e/boss"  # রাখলাম, কিন্তু ব্যবহার হবে না (শুধু কাঠামোর জন্য)
 
 # ================== লগিং ==================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -27,7 +30,7 @@ PENDING_FILE = "pending_cookies.json"
 CONFIG_FILE = "config.json"
 
 # ================== গ্লোবাল ভেরিয়েবল ==================
-pending_cookies = []
+pending_cookies = []  # এখন আর কেউ যোগ করবে না, তবে রাখলাম
 subscribed_users = set()
 api_status = {
     "online": False,
@@ -119,10 +122,9 @@ def answer_callback(cb_id, text=None):
     except:
         pass
 
-# ================== কিবোর্ড ==================
+# ================== কিবোর্ড (আপডেটেড) ==================
 def get_main_keyboard(chat_id):
     kb = [
-        ["📤 কুকি সাবমিট করুন"],
         ["📊 API স্ট্যাটাস", "⏳ পেন্ডিং দেখুন"]
     ]
     if str(chat_id) == ADMIN_CHAT_ID:
@@ -132,22 +134,19 @@ def get_main_keyboard(chat_id):
 def admin_keyboard():
     return {
         "keyboard": [
-            ["📊 সার্বিক পরিসংখ্যান", "📤 ফোর্স পুশ"],
-            ["🗑️ পেন্ডিং ক্লিয়ার", "🔧 মেইন্টেনেন্স টগল"],
-            ["🔙 মূল মেনু"]
+            ["📊 সার্বিক পরিসংখ্যান", "🗑️ পেন্ডিং ক্লিয়ার"],
+            ["🔧 মেইন্টেনেন্স টগল", "🔙 মূল মেনু"]
         ],
         "resize_keyboard": True
     }
 
-# ================== API ইন্টিগ্রেশন (আপডেটেড) ==================
+# ================== API ইন্টিগ্রেশন ==================
 def fetch_api_status():
-    """API থেকে রিয়েল টাইম স্ট্যাটাস নিয়ে আসে"""
     global api_status, last_check_time
     try:
         resp = requests.get(API_INFO_URL, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
-            # API অনলাইন কিনা: offline_locked false হলে এবং webhook_status fail না হলে
             is_online = not data.get("api_offline_locked", True) and data.get("webhook_status") != "fail"
             
             api_status = {
@@ -178,103 +177,15 @@ def fetch_api_status():
         return api_status
 
 def check_api_status():
-    """শুধু অনলাইন/অফলাইন স্ট্যাটাস রিটার্ন করে"""
     status = fetch_api_status()
     return status["online"]
 
-def submit_cookie_to_api(cookie_text):
-    """API-তে কুকি পাঠায় (আগের মতোই)"""
-    try:
-        payload = {"cookies": cookie_text}
-        headers = {"Content-Type": "application/json"}
-        resp = requests.post(API_SUBMIT_URL, json=payload, headers=headers, timeout=15)
-        if 200 <= resp.status_code < 300:
-            return True
-        else:
-            logger.warning(f"API রেসপন্স: {resp.status_code} - {resp.text[:200]}")
-            return False
-    except Exception as e:
-        logger.error(f"API পুশ error: {e}")
-        return False
-
-# ================== কুকি হ্যান্ডলিং ==================
-def add_to_queue(user_id, cookie_text):
+# ================== পেন্ডিং ক্লিয়ার (শুধু অ্যাডমিনের জন্য) ==================
+def clear_pending(chat_id):
     with data_lock:
-        pending_cookies.append({
-            "id": uuid.uuid4().hex[:8],
-            "user_id": str(user_id),
-            "cookies": cookie_text,
-            "timestamp": time.time()
-        })
+        pending_cookies.clear()
         save_all()
-    logger.info(f"কিউতে যোগ: ইউজার {user_id}")
-
-def process_pending_queue():
-    global pending_cookies
-    if not pending_cookies:
-        return
-
-    with data_lock:
-        to_process = pending_cookies.copy()
-        pending_cookies = []
-        save_all()
-
-    success_count = 0
-    fail_count = 0
-    for item in to_process:
-        user_id = item["user_id"]
-        cookie = item["cookies"]
-        if submit_cookie_to_api(cookie):
-            success_count += 1
-            send_telegram_message(
-                f"✅ আপনার আগের জমা দেওয়া কুকি এখন API-তে সফলভাবে পুশ করা হয়েছে (আইডি: {item['id']})।",
-                user_id
-            )
-        else:
-            fail_count += 1
-            with data_lock:
-                pending_cookies.append(item)
-                save_all()
-
-    if success_count > 0:
-        logger.info(f"{success_count} টি কুকি পুশ সফল")
-    if fail_count > 0:
-        logger.warning(f"{fail_count} টি কুকি পুশ ব্যর্থ, কিউতে ফেরত রাখা হলো")
-
-def handle_cookie_submission(chat_id, cookie_text):
-    if config.get("maintenance", False) and str(chat_id) != ADMIN_CHAT_ID:
-        send_telegram_message("🔧 বর্তমানে রক্ষণাবেক্ষণ চলছে। পরে চেষ্টা করুন।", chat_id)
-        return
-
-    if not cookie_text or len(cookie_text.strip()) < 5:
-        send_telegram_message("❌ সঠিক কুকি টেক্সট দিন। খুব ছোট দেখাচ্ছে।", chat_id)
-        return
-
-    # রিয়েল টাইম স্ট্যাটাস fetch
-    status = fetch_api_status()
-    
-    if status["online"]:
-        success = submit_cookie_to_api(cookie_text.strip())
-        if success:
-            send_telegram_message("✅ আপনার কুকি সফলভাবে API-তে পুশ করা হয়েছে। ধন্যবাদ!", chat_id)
-            logger.info(f"ইউজার {chat_id} থেকে কুকি পুশ সফল")
-        else:
-            add_to_queue(chat_id, cookie_text.strip())
-            send_telegram_message("⚠️ API অনলাইন থাকলেও পুশ করতে ব্যর্থ। কিউতে রাখা হলো।", chat_id)
-    else:
-        add_to_queue(chat_id, cookie_text.strip())
-        # অফলাইনের কারণ জানানো
-        reason = ""
-        if status["offline_locked"]:
-            reason = "API অফলাইন লকড"
-        elif status["webhook_status"] == "fail":
-            reason = "ওয়েবহুক ব্যর্থ"
-        else:
-            reason = "অজানা কারণে অফলাইন"
-        send_telegram_message(
-            f"⏳ বায়ার API বর্তমানে অফলাইন।\nকারণ: {reason}\nআপনার কুকি কিউতে সংরক্ষণ করা হয়েছে। API অনলাইন হলে অটো পুশ হবে।",
-            chat_id
-        )
+    send_telegram_message("🗑️ সব পেন্ডিং কুকি ক্লিয়ার করা হয়েছে (যদি থেকে থাকে)।", chat_id)
 
 # ================== ব্যাকগ্রাউন্ড মনিটর থ্রেড ==================
 previous_online_status = None
@@ -286,7 +197,6 @@ def api_monitor_loop():
             current_status = fetch_api_status()
             is_online = current_status["online"]
             
-            # স্ট্যাটাস পরিবর্তন হলে ব্রডকাস্ট
             if previous_online_status is None:
                 previous_online_status = is_online
             elif is_online != previous_online_status:
@@ -295,18 +205,13 @@ def api_monitor_loop():
                 broadcast_message(f"📢 বায়ার API স্ট্যাটাস পরিবর্তন: এখন {status_text}")
                 logger.info(f"API স্ট্যাটাস পরিবর্তন: {status_text}")
 
-            # অনলাইন হলে কিউ প্রসেস
-            if is_online and pending_cookies:
-                process_pending_queue()
-
             time.sleep(config.get("check_interval", 30))
         except Exception as e:
             logger.error(f"মনিটর লুপ error: {e}")
             time.sleep(60)
 
-# ================== স্ট্যাটাস মেসেজ (আপডেটেড) ==================
+# ================== স্ট্যাটাস মেসেজ ==================
 def get_status_text():
-    """API স্ট্যাটাসের বিস্তারিত টেক্সট তৈরি করে"""
     s = api_status
     status_emoji = "🟢" if s["online"] else "🔴"
     status_text = "অনলাইন" if s["online"] else "অফলাইন"
@@ -341,15 +246,17 @@ def handle_start(chat_id):
         subscribed_users.add(str(chat_id))
         save_all()
     send_telegram_message(
-        "🚀 স্বাগতম! এই বট Instagram কুকি API-তে পুশ করার জন্য।\n\n"
-        "📤 'কুকি সাবমিট করুন' বাটনে চেপে কুকি পাঠান।\n"
-        "📊 'API স্ট্যাটাস' দেখে API অনলাইন/অফলাইন ও পরিসংখ্যান জানুন।",
+        "📊 **API মনিটর বটে স্বাগতম!**\n\n"
+        "এই বট শুধু স্কাইসিস্ক্স API-র স্ট্যাটাস দেখানোর জন্য।\n"
+        "কুকি সাবমিট করার অপশন বন্ধ করা হয়েছে।\n\n"
+        "📊 স্ট্যাটাস দেখতে নিচের বাটন ব্যবহার করুন।",
         chat_id,
-        reply_markup=get_main_keyboard(chat_id)
+        reply_markup=get_main_keyboard(chat_id),
+        parse_mode="Markdown"
     )
 
 def handle_status(chat_id):
-    fetch_api_status()  # রিফ্রেশ
+    fetch_api_status()
     text = get_status_text()
     send_telegram_message(text, chat_id, parse_mode="Markdown")
 
@@ -375,19 +282,6 @@ def admin_stats(chat_id):
     text += f"\n🔧 মেইন্টেনেন্স: {'🔒 চালু' if config.get('maintenance') else '🔓 বন্ধ'}"
     send_telegram_message(text, chat_id, parse_mode="Markdown", reply_markup=admin_keyboard())
 
-def force_push(chat_id):
-    if not pending_cookies:
-        send_telegram_message("📭 পুশ করার মতো কোনো পেন্ডিং কুকি নেই।", chat_id)
-        return
-    send_telegram_message("⏳ ফোর্স পুশ শুরু হচ্ছে...", chat_id)
-    threading.Thread(target=process_pending_queue, daemon=True).start()
-
-def clear_pending(chat_id):
-    with data_lock:
-        pending_cookies.clear()
-        save_all()
-    send_telegram_message("🗑️ সব পেন্ডিং কুকি ক্লিয়ার করা হয়েছে।", chat_id)
-
 def toggle_maintenance(chat_id):
     current = config.get("maintenance", False)
     config["maintenance"] = not current
@@ -395,7 +289,7 @@ def toggle_maintenance(chat_id):
     status = "চালু" if config["maintenance"] else "বন্ধ"
     send_telegram_message(f"🔧 মেইন্টেনেন্স মোড {status} করা হয়েছে।", chat_id)
 
-# ================== মেসেজ হ্যান্ডলার ==================
+# ================== মেসেজ হ্যান্ডলার (আপডেটেড) ==================
 last_update_id = 0
 
 def handle_updates():
@@ -440,13 +334,6 @@ def process_update(update):
             return
 
         # ===== মেনু বাটন =====
-        if text == "📤 কুকি সাবমিট করুন":
-            send_telegram_message(
-                "📤 আপনার কুকি টেক্সট লিখে পাঠান।\nঅথবা `.txt` ফাইল আপলোড করুন।\nবাতিল করতে /cancel লিখুন।",
-                chat_id
-            )
-            return
-
         if text == "📊 API স্ট্যাটাস":
             handle_status(chat_id)
             return
@@ -461,10 +348,6 @@ def process_update(update):
 
         if text == "📊 সার্বিক পরিসংখ্যান" and chat_id == ADMIN_CHAT_ID:
             admin_stats(chat_id)
-            return
-
-        if text == "📤 ফোর্স পুশ" and chat_id == ADMIN_CHAT_ID:
-            force_push(chat_id)
             return
 
         if text == "🗑️ পেন্ডিং ক্লিয়ার" and chat_id == ADMIN_CHAT_ID:
@@ -483,38 +366,16 @@ def process_update(update):
             send_telegram_message("❌ বাতিল করা হয়েছে।", chat_id, reply_markup=get_main_keyboard(chat_id))
             return
 
-        # ===== ডকুমেন্ট (ফাইল) =====
-        if "document" in msg:
-            file_obj = msg["document"]
-            if file_obj.get("mime_type") == "text/plain" or file_obj.get("file_name", "").endswith(".txt"):
-                try:
-                    file_id = file_obj["file_id"]
-                    file_info = requests.get(
-                        f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
-                    ).json()
-                    file_path = file_info["result"]["file_path"]
-                    file_content = requests.get(
-                        f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
-                    ).text
-                    if file_content.strip():
-                        handle_cookie_submission(chat_id, file_content.strip())
-                    else:
-                        send_telegram_message("❌ ফাইলটি খালি।", chat_id)
-                except Exception as e:
-                    logger.error(f"ফাইল রিড error: {e}")
-                    send_telegram_message("❌ ফাইল পড়তে সমস্যা হয়েছে।", chat_id)
-                return
-
-        # ===== সাধারণ টেক্সট (কুকি) =====
-        if text and not text.startswith("/"):
-            # মেনু আইটেম চেক
-            menu_items = [
-                "📤 কুকি সাবমিট করুন", "📊 API স্ট্যাটাস", "⏳ পেন্ডিং দেখুন",
-                "⚙️ অ্যাডমিন প্যানেল", "📊 সার্বিক পরিসংখ্যান", "📤 ফোর্স পুশ",
-                "🗑️ পেন্ডিং ক্লিয়ার", "🔧 মেইন্টেনেন্স টগল", "🔙 মূল মেনু"
-            ]
-            if text not in menu_items:
-                handle_cookie_submission(chat_id, text)
+        # ===== ডকুমেন্ট / ফাইল হ্যান্ডলিং বাদ =====
+        # ===== কুকি হিসেবে টেক্সট গ্রহণ বাদ =====
+        
+        # অচেনা টেক্সট
+        if text:
+            send_telegram_message(
+                "❌ এই বট শুধু স্ট্যাটাস দেখানোর জন্য। কুকি সাবমিট করার অপশন বন্ধ করা হয়েছে।",
+                chat_id,
+                reply_markup=get_main_keyboard(chat_id)
+            )
 
     elif "callback_query" in update:
         cb = update["callback_query"]
@@ -524,7 +385,7 @@ def process_update(update):
 # ================== ফ্লাস্ক ==================
 @app.route("/")
 def home():
-    return "Cookie Pusher Bot is Running!"
+    return "Cookie Monitor Bot is Running!"
 
 # ================== মেইন ==================
 if __name__ == "__main__":
