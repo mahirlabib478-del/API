@@ -53,7 +53,7 @@ config = {
                      "2️⃣ আপনার Instagram ইউজারনেম দিন।\n"
                      "3️⃣ 2FA কোড দিন (যদি থাকে)।\n"
                      "4️⃣ ৫টি প্রোফাইল ফলো করুন ও প্রোফাইল পিক সেট করুন।\n"
-                     "5️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে。"
+                     "5️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে।"
 }
 user_balances = {}
 user_info = {}
@@ -205,8 +205,8 @@ def t(key, user_id, **kwargs):
             "withdraw_submitted": "✅ **Withdraw request submitted!**\n🆔 **ID:** `{w_id}`\n💰 **Amount:** {amount} BDT\n📌 Status: ⏳ Pending",
             "insufficient": "❌ **Insufficient balance!**",
             "invalid_amount": "❌ **Enter a valid amount.**",
-            "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\nNow please enter your **Instagram username**:",
-            "enter_username": "👤 **Enter your Instagram username:**",
+            "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\nPlease tap the button below and enter your **Instagram username**:",
+            "enter_username_prompt": "👤 **Please enter your actual Instagram username:**",
             "twofa_prompt": "🔐 **Please enter your 2FA code:**",
             "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles & set profile picture**. Have you done that?",
             "follow_yes": "⚠️ **Please follow 5 profiles & set profile picture** then press **Yes**.",
@@ -256,8 +256,8 @@ def t(key, user_id, **kwargs):
             "withdraw_submitted": "✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n🆔 **আইডি:** `{w_id}`\n💰 **পরিমাণ:** {amount} টাকা\n📌 স্ট্যাটাস: ⏳ পেন্ডিং",
             "insufficient": "❌ **অপর্যাপ্ত ব্যালেন্স!**",
             "invalid_amount": "❌ **সঠিক টাকার পরিমাণ দিন।**",
-            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\nএখন আপনার **Instagram ইউজারনেম** দিন:",
-            "enter_username": "👤 **আপনার Instagram ইউজারনেম দিন:**",
+            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\nনিচের বাটনে ক্লিক করে আপনার **Instagram ইউজারনেম** দিন:",
+            "enter_username_prompt": "👤 **আপনার প্রকৃত Instagram ইউজারনেম দিন:**",
             "twofa_prompt": "🔐 **2FA কোড দিন:**",
             "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
             "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
@@ -267,7 +267,7 @@ def t(key, user_id, **kwargs):
             "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
             "cancelled": "❌ বাতিল করা হয়েছে।",
             "unknown": "❌ আমি বুঝতে পারিনি। দয়া করে নিচের বাটন ব্যবহার করুন।",
-            "work": "📱 **Instagram Work**\n\n{rules}\n\n👇 **Start** বাটনে ক্লিক করুন。",
+            "work": "📱 **Instagram Work**\n\n{rules}\n\n👇 **Start** বাটনে ক্লিক করুন।",
             "language_changed": "🌐 ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
             "admin_panel": "⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**",
             "add_accounts": "📧 **ইমেইল লিস্ট দিন**\n\nপ্রতি লাইনে একটি:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nবাতিল করতে /cancel লিখুন।",
@@ -397,6 +397,17 @@ def work_start_keyboard(chat_id):
     return {
         "keyboard": [
             ["🚀 Start" if lang == "en" else "🚀 শুরু করুন"],
+            ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
+        ],
+        "resize_keyboard": True
+    }
+
+# ================== NEW: USERNAME INPUT KEYBOARD ==================
+def username_input_keyboard(chat_id):
+    lang = get_lang(chat_id)
+    return {
+        "keyboard": [
+            ["👤 Enter Username" if lang == "en" else "👤 ইউজারনেম দিন"],
             ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
         ],
         "resize_keyboard": True
@@ -998,41 +1009,48 @@ def process_restore_file(chat_id, file_content):
     clear_session(chat_id)
 
 def admin_list_created_accounts(chat_id, page=0, message_id=None):
-    total = len(created_accounts)
-    if total == 0:
-        send_message(t("created_accounts_empty", chat_id), chat_id, reply_markup=admin_keyboard())
-        return
-    per_page = 10
-    total_pages = (total + per_page - 1) // per_page
-    page = max(0, min(page, total_pages - 1))
-    start = page * per_page
-    end = min(start + per_page, total)
-    page_items = created_accounts[start:end]
-    lang = get_lang(chat_id)
-    lines = [t("created_accounts_list", chat_id, page=page+1, total_pages=total_pages)]
-    for acc in page_items:
-        time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%d/%m %H:%M")
-        lines.append(t("created_account_item", chat_id,
-                       username=acc["username"],
-                       email=acc["email"],
-                       password=acc["password"],
-                       twofa=acc["twofa"],
-                       user_id=acc["user_id"],
-                       time=time_str))
-    text = "\n".join(lines)
-    kb = {"inline_keyboard": []}
-    nav = []
-    if page > 0:
-        nav.append({"text": "⬅️ Previous" if lang == "en" else "⬅️ আগের", "callback_data": f"capage_{page-1}"})
-    if page < total_pages - 1:
-        nav.append({"text": "Next ➡️" if lang == "en" else "পরের ➡️", "callback_data": f"capage_{page+1}"})
-    if nav:
-        kb["inline_keyboard"].append(nav)
-    kb["inline_keyboard"].append([{"text": "🔙 Close" if lang == "en" else "🔙 বন্ধ", "callback_data": "close_calist"}])
-    if message_id:
-        edit_message_text(chat_id, message_id, text, reply_markup=kb)
-    else:
-        send_message(text, chat_id, reply_markup=kb)
+    try:
+        total = len(created_accounts)
+        logger.info(f"admin_list_created_accounts called, total: {total}")
+        if total == 0:
+            msg = t("created_accounts_empty", chat_id)
+            send_message(msg, chat_id, reply_markup=admin_keyboard())
+            return
+
+        per_page = 10
+        total_pages = (total + per_page - 1) // per_page
+        page = max(0, min(page, total_pages - 1))
+        start = page * per_page
+        end = min(start + per_page, total)
+        page_items = created_accounts[start:end]
+        lang = get_lang(chat_id)
+        lines = [t("created_accounts_list", chat_id, page=page+1, total_pages=total_pages)]
+        for acc in page_items:
+            time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%d/%m %H:%M")
+            lines.append(t("created_account_item", chat_id,
+                           username=acc["username"],
+                           email=acc["email"],
+                           password=acc["password"],
+                           twofa=acc["twofa"],
+                           user_id=acc["user_id"],
+                           time=time_str))
+        text = "\n".join(lines)
+        kb = {"inline_keyboard": []}
+        nav = []
+        if page > 0:
+            nav.append({"text": "⬅️ Previous" if lang == "en" else "⬅️ আগের", "callback_data": f"capage_{page-1}"})
+        if page < total_pages - 1:
+            nav.append({"text": "Next ➡️" if lang == "en" else "পরের ➡️", "callback_data": f"capage_{page+1}"})
+        if nav:
+            kb["inline_keyboard"].append(nav)
+        kb["inline_keyboard"].append([{"text": "🔙 Close" if lang == "en" else "🔙 বন্ধ", "callback_data": "close_calist"}])
+        if message_id:
+            edit_message_text(chat_id, message_id, text, reply_markup=kb)
+        else:
+            send_message(text, chat_id, reply_markup=kb)
+    except Exception as e:
+        logger.error(f"Error in admin_list_created_accounts: {e}")
+        send_message("❌ An error occurred while fetching created accounts.", chat_id, reply_markup=admin_keyboard())
 
 def admin_export_excel(chat_id):
     if not created_accounts:
@@ -1096,22 +1114,25 @@ def start_work(chat_id):
         return
     assign_credential_to_user(cred, chat_id)
     
-    # 🔥 FIX: set step to "username_input" so that the user's username input is processed
     set_session(chat_id, {
         "active": True,
-        "step": "username_input",   # changed from "username"
+        "step": "username_input",
         "email": cred["email"],
         "password": cred["password"],
         "username": None,
         "twofa": None
     })
     send_message(t("account_assigned", chat_id, email=cred["email"], password=cred["password"]),
-                 chat_id, reply_markup=cancel_keyboard(chat_id))
+                 chat_id, reply_markup=username_input_keyboard(chat_id))  # New keyboard
 
 def process_username(chat_id, text):
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "username_input":
         return False
+    # Ensure the user didn't just click the button again
+    if text in ["👤 Enter Username", "👤 ইউজারনেম দিন"]:
+        send_message(t("enter_username_prompt", chat_id), chat_id)
+        return True
     username = text.strip()
     if not username:
         send_message("❌ Username cannot be empty. Please enter again:", chat_id)
@@ -1144,7 +1165,6 @@ def process_follow_yes(chat_id):
     if uid in user_info:
         user_info[uid]["total_accounts"] = user_info[uid].get("total_accounts", 0) + 1
         save_json(USER_INFO_FILE, user_info)
-    # Save created account
     username = session.get("username", "N/A")
     twofa = session.get("twofa", "N/A")
     save_created_account(username, session["email"], session["password"], twofa, chat_id)
@@ -1414,6 +1434,10 @@ def process_update(update):
             if session.get("active"):
                 step = session.get("step")
                 if step == "username_input":
+                    # If user clicks the username button, prompt them
+                    if text in ["👤 Enter Username", "👤 ইউজারনেম দিন"]:
+                        send_message(t("enter_username_prompt", chat_id), chat_id)
+                        return
                     process_username(chat_id, text)
                     return
                 if step == "twofa":
