@@ -12,6 +12,7 @@ from datetime import datetime
 # ================== CONFIGURATION ==================
 BOT_TOKEN = "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI"
 ADMIN_CHAT_ID = "8538304896"
+CHANNEL_ID = "-1003903695158"  # Hardcoded channel ID
 
 # ================== LOGGING ==================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,7 +35,7 @@ credentials = []
 withdraw_requests = []
 config = {
     "base_balance": 10.0,
-    "channel_id": "",
+    "channel_id": CHANNEL_ID,  # Set from hardcoded value
     "maintenance_mode": False,
     "work_rules_en": "📱 **Instagram Account Opening Guidelines**\n\n"
                      "1️⃣ You will receive an email and password.\n"
@@ -49,10 +50,9 @@ config = {
 }
 user_balances = {}
 user_info = {}
-user_language = {}  # user_id -> "en" or "bn"
+user_language = {}
 
 admin_cred_upload_session = {}
-admin_list_page = {}  # admin_chat_id -> current_page
 last_backup_message_id = None
 last_backup_part_ids = []
 save_pending = False
@@ -93,6 +93,11 @@ def load_all():
         if k not in cfg:
             cfg[k] = config[k]
     config = cfg
+    
+    # Ensure channel_id is set even if config file is missing
+    if not config.get("channel_id"):
+        config["channel_id"] = CHANNEL_ID
+        save_json(CONFIG_FILE, config)
 
 def save_all():
     save_json(USERS_FILE, list(subscribed_users))
@@ -122,117 +127,6 @@ def execute_backup():
     with data_lock:
         save_pending = False
     save_data_to_channel()
-
-# ================== LANGUAGE HELPERS ==================
-def get_lang(user_id):
-    return user_language.get(str(user_id), "en")
-
-def set_lang(user_id, lang):
-    user_language[str(user_id)] = lang
-    save_json(LANGUAGE_FILE, user_language)
-
-def t(key, user_id, **kwargs):
-    """Translation function"""
-    lang = get_lang(user_id)
-    translations = {
-        "en": {
-            "welcome": "🤖 **Instagram Account Opener Bot**\n\nI help you open Instagram accounts.\nUse the buttons below to start.",
-            "balance": "💰 **Your Balance**\n\nBalance: `{balance:.2f}` BDT\nTotal Accounts Opened: {total}",
-            "withdraw": "💸 **Withdraw**\n\nChoose your withdrawal method:",
-            "enter_account": "📞 Enter your {method} account number:",
-            "enter_amount": "💰 **Enter the amount** you want to withdraw:",
-            "withdraw_submitted": "✅ **Withdraw request submitted!**\n🆔 **ID:** `{w_id}`\n💰 **Amount:** {amount} BDT\n📌 Status: ⏳ Pending",
-            "insufficient": "❌ **Insufficient balance!**",
-            "invalid_amount": "❌ **Enter a valid amount.**",
-            "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\n🔐 Press the button below to enter your 2FA code:",
-            "twofa_prompt": "🔐 **Please enter your 2FA code:**",
-            "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles**. Have you followed them?",
-            "follow_yes": "⚠️ **Please follow 5 profiles** and then press **Yes**.",
-            "completed": "🎉 **Congratulations! Account opening completed!**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** BDT added to your balance.",
-            "no_accounts": "❌ **No available accounts!** Please contact admin.",
-            "active_session": "⏳ You already have an active session. Please finish or cancel it.",
-            "under_maintenance": "🔧 **Bot is under maintenance. Please try later.**",
-            "cancelled": "❌ Cancelled.",
-            "unknown": "❌ I didn't understand that. Please use the buttons below.",
-            "work": "📱 **Instagram Work**\n\n{0}\n\n👇 Press **Start** to begin.",
-            "work_rules": config.get("work_rules_en", ""),
-            "language_changed": "🌐 Language changed to English.",
-            "admin_panel": "⚙️ **Admin Control Panel**",
-            "add_accounts": "📧 **Enter Email List**\n\nOne per line:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nType /cancel to abort.",
-            "add_accounts_success": "✅ **{added} accounts added.** Total: {total}",
-            "no_valid_emails": "❌ **No valid emails found.**",
-            "enter_password": "🔑 **Enter the password** (same for all accounts):",
-            "password_empty": "❌ **Password cannot be empty.**",
-            "account_list": "📋 **Account List** (Page {page}/{total_pages})\n\n",
-            "account_item": "`{email}` | `{password}` | {status}",
-            "deleted_all": "🗑️ **{count} accounts deleted.**",
-            "stats": "📊 **Statistics**\n\n👥 Users: {users}\n📦 Credentials: {total} (Used: {used})\n💸 Pending Withdraw: {pending}\n💰 Price per account: {price} BDT",
-            "no_pending": "📭 **No pending withdraw requests.**",
-            "pending_withdraws": "📥 **Pending Withdraw Requests**\n\n",
-            "pending_item": "🆔 `{id}` | 👤 `{user}` | 💰 `{amount}` | 💳 {method}",
-            "approve_success": "✅ **Withdraw {w_id} approved.**",
-            "reject_success": "❌ **Withdraw {w_id} rejected.**",
-            "not_found": "❌ {w_id} not found.",
-            "price_set": "✅ Price per account set to **{price}** BDT.",
-            "rules_updated": "✅ **Rules updated.**",
-            "channel_set": "✅ Channel ID set to `{channel}`.",
-            "backup_created": "✅ **Backup created!**",
-            "restore_completed": "✅ **Restore completed!**",
-            "backup_creating": "⏳ **Creating backup...**",
-            "restoring": "⏳ **Restoring data...**",
-        },
-        "bn": {
-            "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
-            "balance": "💰 **আপনার ব্যালেন্স**\n\nব্যালেন্স: `{balance:.2f}` টাকা\nমোট অ্যাকাউন্ট খোলা: {total}",
-            "withdraw": "💸 **উইথড্র করুন**\n\nআপনার টাকা উত্তোলনের মাধ্যম নির্বাচন করুন:",
-            "enter_account": "📞 আপনার {method} অ্যাকাউন্ট নম্বর দিন:",
-            "enter_amount": "💰 **কত টাকা উইথড্র করতে চান?**",
-            "withdraw_submitted": "✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n🆔 **আইডি:** `{w_id}`\n💰 **পরিমাণ:** {amount} টাকা\n📌 স্ট্যাটাস: ⏳ পেন্ডিং",
-            "insufficient": "❌ **অপর্যাপ্ত ব্যালেন্স!**",
-            "invalid_amount": "❌ **সঠিক টাকার পরিমাণ দিন।**",
-            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\n🔐 নিচের বাটনে ক্লিক করে 2FA কোড দিন:",
-            "twofa_prompt": "🔐 **2FA কোড দিন:**",
-            "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো** করুন। ফলো করেছেন?",
-            "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
-            "completed": "🎉 **অভিনন্দন! অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।",
-            "no_accounts": "❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!** অ্যাডমিনের সাথে যোগাযোগ করুন।",
-            "active_session": "⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।",
-            "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
-            "cancelled": "❌ বাতিল করা হয়েছে।",
-            "unknown": "❌ আমি বুঝতে পারিনি। দয়া করে নিচের বাটন ব্যবহার করুন।",
-            "work": "📱 **Instagram Work**\n\n{0}\n\n👇 **Start** বাটনে ক্লিক করুন।",
-            "work_rules": config.get("work_rules_bn", ""),
-            "language_changed": "🌐 ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
-            "admin_panel": "⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**",
-            "add_accounts": "📧 **ইমেইল লিস্ট দিন**\n\nপ্রতি লাইনে একটি:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nবাতিল করতে /cancel লিখুন।",
-            "add_accounts_success": "✅ **{added} টি অ্যাকাউন্ট যোগ করা হয়েছে।** মোট: {total}",
-            "no_valid_emails": "❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**",
-            "enter_password": "🔑 **পাসওয়ার্ড দিন** (সব অ্যাকাউন্টের জন্য একই):",
-            "password_empty": "❌ **পাসওয়ার্ড খালি রাখা যাবে না।**",
-            "account_list": "📋 **অ্যাকাউন্ট লিস্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
-            "account_item": "`{email}` | `{password}` | {status}",
-            "deleted_all": "🗑️ **{count} টি অ্যাকাউন্ট ডিলিট করা হয়েছে।**",
-            "stats": "📊 **পরিসংখ্যান**\n\n👥 ইউজার: {users}\n📦 ক্রেডেনশিয়াল: {total} (ব্যবহৃত: {used})\n💸 পেন্ডিং উইথড্র: {pending}\n💰 প্রতি অ্যাকাউন্ট মূল্য: {price} টাকা",
-            "no_pending": "📭 **কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই।**",
-            "pending_withdraws": "📥 **পেন্ডিং উইথড্র রিকোয়েস্ট**\n\n",
-            "pending_item": "🆔 `{id}` | 👤 `{user}` | 💰 `{amount}` | 💳 {method}",
-            "approve_success": "✅ **উইথড্র {w_id} অনুমোদিত হয়েছে।**",
-            "reject_success": "❌ **উইথড্র {w_id} বাতিল করা হয়েছে।**",
-            "not_found": "❌ {w_id} পাওয়া যায়নি।",
-            "price_set": "✅ প্রতি অ্যাকাউন্ট খোলার ইনকাম **{price}** টাকা সেট করা হয়েছে।",
-            "rules_updated": "✅ **নিয়মাবলী আপডেট করা হয়েছে।**",
-            "channel_set": "✅ চ্যানেল আইডি `{channel}` সেট করা হয়েছে।",
-            "backup_created": "✅ **ব্যাকআপ তৈরি হয়েছে!**",
-            "restore_completed": "✅ **রিস্টোর সম্পন্ন!**",
-            "backup_creating": "⏳ **ব্যাকআপ নেওয়া হচ্ছে...**",
-            "restoring": "⏳ **ডেটা রিস্টোর করা হচ্ছে...**",
-        }
-    }
-    
-    text = translations.get(lang, translations["en"]).get(key, key)
-    if kwargs:
-        text = text.format(**kwargs)
-    return text
 
 # ================== TELEGRAM HELPERS ==================
 def send_message(text, chat_id, reply_markup=None, parse_mode="Markdown"):
@@ -282,6 +176,115 @@ def edit_message_text(chat_id, message_id, text, reply_markup=None):
     except Exception as e:
         logger.error(f"Edit error: {e}")
         return None
+
+# ================== LANGUAGE HELPERS ==================
+def get_lang(user_id):
+    return user_language.get(str(user_id), "en")
+
+def set_lang(user_id, lang):
+    user_language[str(user_id)] = lang
+    save_json(LANGUAGE_FILE, user_language)
+
+def t(key, user_id, **kwargs):
+    """Translation function - use kwargs for dynamic values"""
+    lang = get_lang(user_id)
+    translations = {
+        "en": {
+            "welcome": "🤖 **Instagram Account Opener Bot**\n\nI help you open Instagram accounts.\nUse the buttons below to start.",
+            "balance": "💰 **Your Balance**\n\nBalance: `{balance:.2f}` BDT\nTotal Accounts Opened: {total}",
+            "withdraw": "💸 **Withdraw**\n\nChoose your withdrawal method:",
+            "enter_account": "📞 Enter your {method} account number:",
+            "enter_amount": "💰 **Enter the amount** you want to withdraw:",
+            "withdraw_submitted": "✅ **Withdraw request submitted!**\n🆔 **ID:** `{w_id}`\n💰 **Amount:** {amount} BDT\n📌 Status: ⏳ Pending",
+            "insufficient": "❌ **Insufficient balance!**",
+            "invalid_amount": "❌ **Enter a valid amount.**",
+            "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\n🔐 Press the button below to enter your 2FA code:",
+            "twofa_prompt": "🔐 **Please enter your 2FA code:**",
+            "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles**. Have you followed them?",
+            "follow_yes": "⚠️ **Please follow 5 profiles** and then press **Yes**.",
+            "completed": "🎉 **Congratulations! Account opening completed!**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** BDT added to your balance.",
+            "no_accounts": "❌ **No available accounts!** Please contact admin.",
+            "active_session": "⏳ You already have an active session. Please finish or cancel it.",
+            "under_maintenance": "🔧 **Bot is under maintenance. Please try later.**",
+            "cancelled": "❌ Cancelled.",
+            "unknown": "❌ I didn't understand that. Please use the buttons below.",
+            "work": "📱 **Instagram Work**\n\n{rules}\n\n👇 Press **Start** to begin.",
+            "language_changed": "🌐 Language changed to English.",
+            "admin_panel": "⚙️ **Admin Control Panel**",
+            "add_accounts": "📧 **Enter Email List**\n\nOne per line:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nType /cancel to abort.",
+            "add_accounts_success": "✅ **{added} accounts added.** Total: {total}",
+            "no_valid_emails": "❌ **No valid emails found.**",
+            "enter_password": "🔑 **Enter the password** (same for all accounts):",
+            "password_empty": "❌ **Password cannot be empty.**",
+            "account_list": "📋 **Account List** (Page {page}/{total_pages})\n\n",
+            "account_item": "`{email}` | `{password}` | {status}",
+            "deleted_all": "🗑️ **{count} accounts deleted.**",
+            "stats": "📊 **Statistics**\n\n👥 Users: {users}\n📦 Credentials: {total} (Used: {used})\n💸 Pending Withdraw: {pending}\n💰 Price per account: {price} BDT",
+            "no_pending": "📭 **No pending withdraw requests.**",
+            "pending_withdraws": "📥 **Pending Withdraw Requests**\n\n",
+            "pending_item": "🆔 `{id}` | 👤 `{user}` | 💰 `{amount}` | 💳 {method}",
+            "approve_success": "✅ **Withdraw {w_id} approved.**",
+            "reject_success": "❌ **Withdraw {w_id} rejected.**",
+            "not_found": "❌ {w_id} not found.",
+            "price_set": "✅ Price per account set to **{price}** BDT.",
+            "rules_updated": "✅ **Rules updated.**",
+            "channel_set": "✅ Channel ID set to `{channel}`.",
+            "backup_created": "✅ **Backup created!**",
+            "restore_completed": "✅ **Restore completed!**",
+            "backup_creating": "⏳ **Creating backup...**",
+            "restoring": "⏳ **Restoring data...**",
+        },
+        "bn": {
+            "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
+            "balance": "💰 **আপনার ব্যালেন্স**\n\nব্যালেন্স: `{balance:.2f}` টাকা\nমোট অ্যাকাউন্ট খোলা: {total}",
+            "withdraw": "💸 **উইথড্র করুন**\n\nআপনার টাকা উত্তোলনের মাধ্যম নির্বাচন করুন:",
+            "enter_account": "📞 আপনার {method} অ্যাকাউন্ট নম্বর দিন:",
+            "enter_amount": "💰 **কত টাকা উইথড্র করতে চান?**",
+            "withdraw_submitted": "✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n🆔 **আইডি:** `{w_id}`\n💰 **পরিমাণ:** {amount} টাকা\n📌 স্ট্যাটাস: ⏳ পেন্ডিং",
+            "insufficient": "❌ **অপর্যাপ্ত ব্যালেন্স!**",
+            "invalid_amount": "❌ **সঠিক টাকার পরিমাণ দিন।**",
+            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\n🔐 নিচের বাটনে ক্লিক করে 2FA কোড দিন:",
+            "twofa_prompt": "🔐 **2FA কোড দিন:**",
+            "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো** করুন। ফলো করেছেন?",
+            "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
+            "completed": "🎉 **অভিনন্দন! অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।",
+            "no_accounts": "❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!** অ্যাডমিনের সাথে যোগাযোগ করুন।",
+            "active_session": "⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।",
+            "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
+            "cancelled": "❌ বাতিল করা হয়েছে।",
+            "unknown": "❌ আমি বুঝতে পারিনি। দয়া করে নিচের বাটন ব্যবহার করুন।",
+            "work": "📱 **Instagram Work**\n\n{rules}\n\n👇 **Start** বাটনে ক্লিক করুন।",
+            "language_changed": "🌐 ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
+            "admin_panel": "⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**",
+            "add_accounts": "📧 **ইমেইল লিস্ট দিন**\n\nপ্রতি লাইনে একটি:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nবাতিল করতে /cancel লিখুন।",
+            "add_accounts_success": "✅ **{added} টি অ্যাকাউন্ট যোগ করা হয়েছে।** মোট: {total}",
+            "no_valid_emails": "❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**",
+            "enter_password": "🔑 **পাসওয়ার্ড দিন** (সব অ্যাকাউন্টের জন্য একই):",
+            "password_empty": "❌ **পাসওয়ার্ড খালি রাখা যাবে না।**",
+            "account_list": "📋 **অ্যাকাউন্ট লিস্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
+            "account_item": "`{email}` | `{password}` | {status}",
+            "deleted_all": "🗑️ **{count} টি অ্যাকাউন্ট ডিলিট করা হয়েছে।**",
+            "stats": "📊 **পরিসংখ্যান**\n\n👥 ইউজার: {users}\n📦 ক্রেডেনশিয়াল: {total} (ব্যবহৃত: {used})\n💸 পেন্ডিং উইথড্র: {pending}\n💰 প্রতি অ্যাকাউন্ট মূল্য: {price} টাকা",
+            "no_pending": "📭 **কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই।**",
+            "pending_withdraws": "📥 **পেন্ডিং উইথড্র রিকোয়েস্ট**\n\n",
+            "pending_item": "🆔 `{id}` | 👤 `{user}` | 💰 `{amount}` | 💳 {method}",
+            "approve_success": "✅ **উইথড্র {w_id} অনুমোদিত হয়েছে।**",
+            "reject_success": "❌ **উইথড্র {w_id} বাতিল করা হয়েছে।**",
+            "not_found": "❌ {w_id} পাওয়া যায়নি।",
+            "price_set": "✅ প্রতি অ্যাকাউন্ট খোলার ইনকাম **{price}** টাকা সেট করা হয়েছে।",
+            "rules_updated": "✅ **নিয়মাবলী আপডেট করা হয়েছে।**",
+            "channel_set": "✅ চ্যানেল আইডি `{channel}` সেট করা হয়েছে।",
+            "backup_created": "✅ **ব্যাকআপ তৈরি হয়েছে!**",
+            "restore_completed": "✅ **রিস্টোর সম্পন্ন!**",
+            "backup_creating": "⏳ **ব্যাকআপ নেওয়া হচ্ছে...**",
+            "restoring": "⏳ **ডেটা রিস্টোর করা হচ্ছে...**",
+        }
+    }
+    
+    text = translations.get(lang, translations["en"]).get(key, key)
+    if kwargs:
+        text = text.format(**kwargs)
+    return text
 
 # ================== BALANCE & USER FUNCTIONS ==================
 def add_balance(user_id, amount):
@@ -765,7 +768,9 @@ def process_admin_creds_password(chat_id, text):
 def admin_list_creds(chat_id, page=0, message_id=None):
     total = len(credentials)
     if total == 0:
-        send_message("📭 **No credentials available.**", chat_id, reply_markup=admin_keyboard())
+        lang = get_lang(chat_id)
+        msg = "📭 **No credentials available.**" if lang == "en" else "📭 **কোনো ক্রেডেনশিয়াল নেই।**"
+        send_message(msg, chat_id, reply_markup=admin_keyboard())
         return
 
     per_page = 10
@@ -939,12 +944,13 @@ def admin_backup(chat_id):
         send_message("❌ Backup failed. Please try again.", chat_id)
 
 def admin_restore(chat_id):
+    lang = get_lang(chat_id)
+    msg = "📥 **Restore from file**\n\nPlease upload the `.json.gz` backup file." if lang == "en" else "📥 **ফাইল থেকে রিস্টোর**\n\nদয়া করে `.json.gz` ব্যাকআপ ফাইল আপলোড করুন।"
     send_message(
-        "📥 **Restore from file**\n\nPlease upload the `.json.gz` backup file.",
+        msg,
         chat_id,
-        reply_markup={"keyboard": [["❌ Cancel" if get_lang(chat_id) == "en" else "❌ বাতিল"]], "resize_keyboard": True}
+        reply_markup={"keyboard": [["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True}
     )
-    # Set a session flag for restore
     set_session(chat_id, {"restore_mode": True})
 
 def process_restore_file(chat_id, file_content):
@@ -992,7 +998,7 @@ def instagram_work(chat_id):
         return
     rules = config.get("work_rules_en" if get_lang(chat_id) == "en" else "work_rules_bn", "")
     send_message(
-        t("work", chat_id, rules),
+        t("work", chat_id, rules=rules),
         chat_id, reply_markup=work_start_keyboard(chat_id)
     )
 
@@ -1181,7 +1187,7 @@ def process_update(update):
             if session and session.get("restore_mode"):
                 if text == "❌ Cancel" or text == "❌ বাতিল":
                     clear_session(chat_id)
-                    send_message("❌ Cancelled.", chat_id, reply_markup=admin_keyboard())
+                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
                     return
                 # Check if document uploaded
                 if "document" in msg:
@@ -1358,7 +1364,9 @@ def process_update(update):
             admin_delete_single_cred(chat_id, index, message_id)
         elif data == "close_list":
             delete_message(chat_id, message_id)
-            send_message("📋 List closed." if get_lang(chat_id) == "en" else "📋 তালিকা বন্ধ করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+            lang = get_lang(chat_id)
+            msg = "📋 List closed." if lang == "en" else "📋 তালিকা বন্ধ করা হয়েছে।"
+            send_message(msg, chat_id, reply_markup=admin_keyboard())
 
 # ================== FLASK ==================
 @app.route("/")
@@ -1370,8 +1378,10 @@ if __name__ == "__main__":
     load_all()
     logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials")
 
+    # Auto restore from channel on startup
     auto_restore_from_channel()
 
+    # Start background threads
     threading.Thread(target=auto_backup_loop, daemon=True).start()
     threading.Thread(target=handle_updates, daemon=True).start()
 
