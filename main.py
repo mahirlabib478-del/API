@@ -9,7 +9,7 @@ from flask import Flask
 from datetime import datetime
 
 # ================== কনফিগারেশন ==================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8692984075:AAFjiQ4aj1YZi8sSCLSGeVsnY0FMOQM2Onw")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI")
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "8538304896")
 API_INFO_URL = "https://skysysx.net/api/info"      # স্ট্যাটাস চেকের URL
 API_SUBMIT_URL = "http://skysysx.net/e/boss"       # কুকি সাবমিটের URL (আগের মতো)
