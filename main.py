@@ -8,11 +8,14 @@ import gzip
 import requests
 from flask import Flask
 from datetime import datetime
+import openpyxl
+from openpyxl.styles import Font, Alignment
+from io import BytesIO
 
 # ================== CONFIGURATION ==================
 BOT_TOKEN = "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI"
 ADMIN_CHAT_ID = "8538304896"
-CHANNEL_ID = "-1003903695158"  # Hardcoded channel ID
+CHANNEL_ID = "-1003903695158"
 
 # ================== LOGGING ==================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -27,26 +30,30 @@ CONFIG_FILE = "config.json"
 USER_BALANCES_FILE = "user_balances.json"
 USER_INFO_FILE = "user_info.json"
 LANGUAGE_FILE = "language.json"
+CREATED_ACCOUNTS_FILE = "created_accounts.json"
 
 # ================== GLOBALS ==================
 subscribed_users = set()
 user_sessions = {}
 credentials = []
 withdraw_requests = []
+created_accounts = []
 config = {
     "base_balance": 10.0,
     "channel_id": CHANNEL_ID,
     "maintenance_mode": False,
     "work_rules_en": "📱 **Instagram Account Opening Guidelines**\n\n"
                      "1️⃣ You will receive an email and password.\n"
-                     "2️⃣ Enter 2FA code if required.\n"
-                     "3️⃣ Follow 5 profiles and set profile picture.\n"
-                     "4️⃣ Upon completion, your balance will be credited.",
+                     "2️⃣ Enter your Instagram username.\n"
+                     "3️⃣ Enter 2FA code if required.\n"
+                     "4️⃣ Follow 5 profiles and set profile picture.\n"
+                     "5️⃣ Upon completion, your balance will be credited.",
     "work_rules_bn": "📱 **Instagram অ্যাকাউন্ট খোলার নিয়মাবলী**\n\n"
                      "1️⃣ আপনি একটি ইমেইল ও পাসওয়ার্ড পাবেন।\n"
-                     "2️⃣ 2FA কোড দিন (যদি থাকে)।\n"
-                     "3️⃣ ৫টি প্রোফাইল ফলো করুন ও প্রোফাইল পিক সেট করুন।\n"
-                     "4️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে।"
+                     "2️⃣ আপনার Instagram ইউজারনেম দিন।\n"
+                     "3️⃣ 2FA কোড দিন (যদি থাকে)।\n"
+                     "4️⃣ ৫টি প্রোফাইল ফলো করুন ও প্রোফাইল পিক সেট করুন।\n"
+                     "5️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে।"
 }
 user_balances = {}
 user_info = {}
@@ -79,11 +86,12 @@ def save_json(filename, data):
             logger.error(f"Save failed {filename}: {e}")
 
 def load_all():
-    global subscribed_users, user_sessions, credentials, withdraw_requests, config, user_balances, user_info, user_language
+    global subscribed_users, user_sessions, credentials, withdraw_requests, config, user_balances, user_info, user_language, created_accounts
     subscribed_users = set(load_json(USERS_FILE, []))
     user_sessions = load_json(SESSIONS_FILE, {})
     credentials = load_json(CREDENTIALS_FILE, [])
     withdraw_requests = load_json(WITHDRAWS_FILE, [])
+    created_accounts = load_json(CREATED_ACCOUNTS_FILE, [])
     user_balances = load_json(USER_BALANCES_FILE, {})
     user_info = load_json(USER_INFO_FILE, {})
     user_language = load_json(LANGUAGE_FILE, {})
@@ -103,6 +111,7 @@ def save_all():
     save_json(SESSIONS_FILE, user_sessions)
     save_json(CREDENTIALS_FILE, credentials)
     save_json(WITHDRAWS_FILE, withdraw_requests)
+    save_json(CREATED_ACCOUNTS_FILE, created_accounts)
     save_json(CONFIG_FILE, config)
     save_json(USER_BALANCES_FILE, user_balances)
     save_json(USER_INFO_FILE, user_info)
@@ -142,7 +151,7 @@ def send_message(text, chat_id, reply_markup=None, parse_mode="Markdown"):
 def send_document(file_bytes, filename, chat_id, caption=""):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
     try:
-        files = {'document': (filename, file_bytes, 'application/gzip')}
+        files = {'document': (filename, file_bytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}
         return requests.post(url, data={"chat_id": chat_id, "caption": caption}, files=files, timeout=60)
     except Exception as e:
         logger.error(f"Document error: {e}")
@@ -196,11 +205,12 @@ def t(key, user_id, **kwargs):
             "withdraw_submitted": "✅ **Withdraw request submitted!**\n🆔 **ID:** `{w_id}`\n💰 **Amount:** {amount} BDT\n📌 Status: ⏳ Pending",
             "insufficient": "❌ **Insufficient balance!**",
             "invalid_amount": "❌ **Enter a valid amount.**",
-            "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\n🔐 Press the button below to enter your 2FA code:",
+            "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\nNow please enter your **Instagram username**:",
+            "enter_username": "👤 **Enter your Instagram username:**",
             "twofa_prompt": "🔐 **Please enter your 2FA code:**",
             "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles & set profile picture**. Have you done that?",
             "follow_yes": "⚠️ **Please follow 5 profiles & set profile picture** then press **Yes**.",
-            "completed": "🎉 **Congratulations! Account opening completed!**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** BDT added to your balance.",
+            "completed": "🎉 **Congratulations! Account opening completed!**\n\n👤 **Username:** `{username}`\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** BDT added to your balance.",
             "no_accounts": "❌ **No available accounts!** Please contact admin.",
             "active_session": "⏳ You already have an active session. Please finish or cancel it.",
             "under_maintenance": "🔧 **Bot is under maintenance. Please try later.**",
@@ -231,6 +241,11 @@ def t(key, user_id, **kwargs):
             "restore_completed": "✅ **Restore completed!**",
             "backup_creating": "⏳ **Creating backup...**",
             "restoring": "⏳ **Restoring data...**",
+            "created_accounts_list": "📁 **Created Accounts** (Page {page}/{total_pages})\n\n",
+            "created_account_item": "👤 {username} | 📧 {email} | 🔑 {password} | 🔐 {twofa} | 👤 {user_id} | 🕒 {time}",
+            "created_accounts_empty": "📭 **No created accounts yet.**",
+            "export_excel": "📥 **Export Excel**\n\nClick below to download all created accounts as Excel file.",
+            "excel_exported": "✅ **Excel file exported!**",
         },
         "bn": {
             "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
@@ -241,11 +256,12 @@ def t(key, user_id, **kwargs):
             "withdraw_submitted": "✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n🆔 **আইডি:** `{w_id}`\n💰 **পরিমাণ:** {amount} টাকা\n📌 স্ট্যাটাস: ⏳ পেন্ডিং",
             "insufficient": "❌ **অপর্যাপ্ত ব্যালেন্স!**",
             "invalid_amount": "❌ **সঠিক টাকার পরিমাণ দিন।**",
-            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\n🔐 নিচের বাটনে ক্লিক করে 2FA কোড দিন:",
+            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\nএখন আপনার **Instagram ইউজারনেম** দিন:",
+            "enter_username": "👤 **আপনার Instagram ইউজারনেম দিন:**",
             "twofa_prompt": "🔐 **2FA কোড দিন:**",
             "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
             "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
-            "completed": "🎉 **অভিনন্দন! অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।",
+            "completed": "🎉 **অভিনন্দন! অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n👤 **ইউজারনেম:** `{username}`\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।",
             "no_accounts": "❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!** অ্যাডমিনের সাথে যোগাযোগ করুন।",
             "active_session": "⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।",
             "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
@@ -276,6 +292,11 @@ def t(key, user_id, **kwargs):
             "restore_completed": "✅ **রিস্টোর সম্পন্ন!**",
             "backup_creating": "⏳ **ব্যাকআপ নেওয়া হচ্ছে...**",
             "restoring": "⏳ **ডেটা রিস্টোর করা হচ্ছে...**",
+            "created_accounts_list": "📁 **তৈরি করা অ্যাকাউন্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
+            "created_account_item": "👤 {username} | 📧 {email} | 🔑 {password} | 🔐 {twofa} | 👤 {user_id} | 🕒 {time}",
+            "created_accounts_empty": "📭 **এখনো কোনো অ্যাকাউন্ট তৈরি হয়নি।**",
+            "export_excel": "📥 **এক্সেল এক্সপোর্ট**\n\nনিচের বাটনে ক্লিক করে সব অ্যাকাউন্টের Excel ফাইল ডাউনলোড করুন।",
+            "excel_exported": "✅ **Excel ফাইল তৈরি হয়েছে!**",
         }
     }
     text = translations.get(lang, translations["en"]).get(key, key)
@@ -327,16 +348,16 @@ def admin_keyboard():
             ["💲 Set Price", "📝 Edit Rules"],
             ["📥 Withdraw Requests", "📁 Backup"],
             ["📥 Restore", f"🔧 Maintenance {maint_status}"],
+            ["📁 Created Accounts", "📥 Export Excel"],
             ["🔙 Main Menu"]
         ],
         "resize_keyboard": True
     }
 
-def twofa_reply_keyboard(chat_id):
+def cancel_keyboard(chat_id):
     lang = get_lang(chat_id)
     return {
         "keyboard": [
-            ["🔐 Enter 2FA" if lang == "en" else "🔐 2FA দিন"],
             ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
         ],
         "resize_keyboard": True
@@ -366,15 +387,6 @@ def withdraw_method_keyboard(chat_id):
     return {
         "keyboard": [
             ["💸 bKash", "💸 Nagad"],
-            ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
-        ],
-        "resize_keyboard": True
-    }
-
-def cancel_keyboard(chat_id):
-    lang = get_lang(chat_id)
-    return {
-        "keyboard": [
             ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
         ],
         "resize_keyboard": True
@@ -418,6 +430,46 @@ def delete_credential_by_index(index):
             return deleted
     return None
 
+# ================== CREATED ACCOUNTS MANAGEMENT ==================
+def save_created_account(username, email, password, twofa, user_id):
+    with data_lock:
+        created_accounts.append({
+            "username": username,
+            "email": email,
+            "password": password,
+            "twofa": twofa,
+            "user_id": str(user_id),
+            "timestamp": time.time()
+        })
+        save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+    trigger_backup()
+
+def generate_created_accounts_excel():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Created Accounts"
+    headers = ["Username", "Email", "Password", "2FA", "User ID", "Timestamp"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+    for acc in created_accounts:
+        time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+        ws.append([acc["username"], acc["email"], acc["password"], acc["twofa"], acc["user_id"], time_str])
+    for col in ws.columns:
+        max_length = 0
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(cell.value)
+            except:
+                pass
+        ws.column_dimensions[col[0].column_letter].width = (max_length + 2) * 1.2
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.read()
+
 # ================== SESSION MANAGEMENT ==================
 def get_session(chat_id):
     return user_sessions.get(str(chat_id))
@@ -458,6 +510,7 @@ def generate_backup_data():
             "subscribed_users": list(subscribed_users),
             "credentials": credentials,
             "withdraw_requests": withdraw_requests,
+            "created_accounts": created_accounts,
             "config": config,
             "user_balances": user_balances,
             "user_info": user_info,
@@ -573,6 +626,8 @@ def manual_restore(chat_id, file_content):
             credentials.extend(data.get("credentials", []))
             withdraw_requests.clear()
             withdraw_requests.extend(data.get("withdraw_requests", []))
+            created_accounts.clear()
+            created_accounts.extend(data.get("created_accounts", []))
             if "config" in data:
                 for k in data["config"]:
                     config[k] = data["config"][k]
@@ -583,7 +638,7 @@ def manual_restore(chat_id, file_content):
             user_language.clear()
             user_language.update(data.get("user_language", {}))
             save_all()
-        logger.info(f"Manual restore completed: {len(subscribed_users)} users, {len(credentials)} credentials")
+        logger.info(f"Manual restore completed: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
         return True
     except Exception as e:
         logger.error(f"Manual restore error: {e}")
@@ -591,7 +646,7 @@ def manual_restore(chat_id, file_content):
 
 def auto_restore_from_channel():
     global last_backup_message_id, last_backup_part_ids
-    global subscribed_users, credentials, withdraw_requests, config, user_balances, user_info, user_language
+    global subscribed_users, credentials, withdraw_requests, config, user_balances, user_info, user_language, created_accounts
 
     channel_id = config.get("channel_id")
     if not channel_id:
@@ -670,6 +725,7 @@ def auto_restore_from_channel():
             subscribed_users = set(data.get("subscribed_users", []))
             credentials = data.get("credentials", [])
             withdraw_requests = data.get("withdraw_requests", [])
+            created_accounts = data.get("created_accounts", [])
             if "config" in data:
                 for k in data["config"]:
                     config[k] = data["config"][k]
@@ -679,7 +735,7 @@ def auto_restore_from_channel():
             last_backup_message_id = pinned["message_id"]
             save_all()
 
-        logger.info(f"Data restored: {len(subscribed_users)} users, {len(credentials)} credentials")
+        logger.info(f"Data restored: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
     except Exception as e:
         logger.error(f"Auto restore error: {e}")
 
@@ -793,25 +849,24 @@ def admin_stats(chat_id):
     total_creds = len(credentials)
     used_creds = len([c for c in credentials if c.get("used", False)])
     pending_withdraw = len([w for w in withdraw_requests if w["status"] == "pending"])
+    total_created = len(created_accounts)
     send_message(
         t("stats", chat_id,
           users=len(subscribed_users),
           total=total_creds,
           used=used_creds,
           pending=pending_withdraw,
-          price=config.get("base_balance", 10.0)),
+          price=config.get("base_balance", 10.0)) + f"\n📁 Created Accounts: {total_created}",
         chat_id, reply_markup=admin_keyboard()
     )
 
-# ================== FIXED FUNCTION ==================
 def admin_show_withdraw_requests(chat_id, page=0, message_id=None):
     pending = [w for w in withdraw_requests if w["status"] == "pending"]
     if not pending:
         send_message(t("no_pending", chat_id), chat_id, reply_markup=admin_keyboard())
         return
-    
     per_page = 5
-    total = len(pending)  # 🔥 FIX: added this line
+    total = len(pending)
     total_pages = (total + per_page - 1) // per_page
     page = max(0, min(page, total_pages - 1))
     start = page * per_page
@@ -847,7 +902,6 @@ def admin_show_withdraw_requests(chat_id, page=0, message_id=None):
     else:
         send_message(msg, chat_id, reply_markup=kb)
 
-# ================== ADMIN FUNCTIONS (continued) ==================
 def admin_approve_withdraw(chat_id, w_id):
     with data_lock:
         for w in withdraw_requests:
@@ -943,6 +997,58 @@ def process_restore_file(chat_id, file_content):
         send_message("❌ Restore failed. Invalid file format.", chat_id, reply_markup=admin_keyboard())
     clear_session(chat_id)
 
+def admin_list_created_accounts(chat_id, page=0, message_id=None):
+    total = len(created_accounts)
+    if total == 0:
+        send_message(t("created_accounts_empty", chat_id), chat_id, reply_markup=admin_keyboard())
+        return
+    per_page = 10
+    total_pages = (total + per_page - 1) // per_page
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    end = min(start + per_page, total)
+    page_items = created_accounts[start:end]
+    lang = get_lang(chat_id)
+    lines = [t("created_accounts_list", chat_id, page=page+1, total_pages=total_pages)]
+    for acc in page_items:
+        time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%d/%m %H:%M")
+        lines.append(t("created_account_item", chat_id,
+                       username=acc["username"],
+                       email=acc["email"],
+                       password=acc["password"],
+                       twofa=acc["twofa"],
+                       user_id=acc["user_id"],
+                       time=time_str))
+    text = "\n".join(lines)
+    kb = {"inline_keyboard": []}
+    nav = []
+    if page > 0:
+        nav.append({"text": "⬅️ Previous" if lang == "en" else "⬅️ আগের", "callback_data": f"capage_{page-1}"})
+    if page < total_pages - 1:
+        nav.append({"text": "Next ➡️" if lang == "en" else "পরের ➡️", "callback_data": f"capage_{page+1}"})
+    if nav:
+        kb["inline_keyboard"].append(nav)
+    kb["inline_keyboard"].append([{"text": "🔙 Close" if lang == "en" else "🔙 বন্ধ", "callback_data": "close_calist"}])
+    if message_id:
+        edit_message_text(chat_id, message_id, text, reply_markup=kb)
+    else:
+        send_message(text, chat_id, reply_markup=kb)
+
+def admin_export_excel(chat_id):
+    if not created_accounts:
+        send_message("📭 No accounts to export.", chat_id, reply_markup=admin_keyboard())
+        return
+    send_message("⏳ Generating Excel file...", chat_id)
+    try:
+        excel_data = generate_created_accounts_excel()
+        filename = f"created_accounts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        resp = send_document(excel_data, filename, chat_id, caption=t("excel_exported", chat_id))
+        if not resp or resp.status_code != 200:
+            send_message("❌ Failed to generate Excel.", chat_id)
+    except Exception as e:
+        logger.error(f"Excel export error: {e}")
+        send_message("❌ Error generating Excel.", chat_id)
+
 # ================== USER COMMANDS ==================
 def start_command(chat_id, chat_type="private"):
     if chat_id not in subscribed_users:
@@ -989,20 +1095,48 @@ def start_work(chat_id):
         send_message(t("no_accounts", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
         return
     assign_credential_to_user(cred, chat_id)
-    set_session(chat_id, {"active": True, "step": "credentials_shown", "email": cred["email"], "password": cred["password"], "twofa": None})
-    send_message(t("account_assigned", chat_id, email=cred["email"], password=cred["password"]), chat_id, reply_markup=twofa_reply_keyboard(chat_id))
+    set_session(chat_id, {
+        "active": True,
+        "step": "username",  # first ask username
+        "email": cred["email"],
+        "password": cred["password"],
+        "username": None,
+        "twofa": None
+    })
+    send_message(t("account_assigned", chat_id, email=cred["email"], password=cred["password"]),
+                 chat_id, reply_markup=cancel_keyboard(chat_id))
 
-def prompt_twofa(chat_id):
+def prompt_username(chat_id):
     session = get_session(chat_id)
     if not session or not session.get("active"):
         return
-    session["step"] = "twofa_input"
+    session["step"] = "username_input"
+    set_session(chat_id, session)
+    send_message(t("enter_username", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
+
+def process_username(chat_id, text):
+    session = get_session(chat_id)
+    if not session or not session.get("active") or session.get("step") != "username_input":
+        return False
+    username = text.strip()
+    if not username:
+        send_message("❌ Username cannot be empty. Please enter again:", chat_id)
+        return True
+    session["username"] = username
+    session["step"] = "twofa"  # next ask 2FA
     set_session(chat_id, session)
     send_message(t("twofa_prompt", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
+    return True
+
+def prompt_twofa(chat_id):
+    # This function is called when user presses "2FA" button (if any) but we handle via step
+    # Actually we will not use this if we directly ask after username.
+    # We'll keep it for compatibility but flow is: username -> twofa
+    pass
 
 def process_twofa(chat_id, text):
     session = get_session(chat_id)
-    if not session or not session.get("active") or session.get("step") != "twofa_input":
+    if not session or not session.get("active") or session.get("step") != "twofa":
         return False
     session["twofa"] = text.strip()
     session["step"] = "follow"
@@ -1022,7 +1156,19 @@ def process_follow_yes(chat_id):
     if uid in user_info:
         user_info[uid]["total_accounts"] = user_info[uid].get("total_accounts", 0) + 1
         save_json(USER_INFO_FILE, user_info)
-    send_message(t("completed", chat_id, email=session['email'], password=session['password'], twofa=session.get('twofa', 'N/A'), price=price), chat_id, reply_markup=next_or_cancel_keyboard(chat_id))
+    # Save created account
+    username = session.get("username", "N/A")
+    twofa = session.get("twofa", "N/A")
+    save_created_account(username, session["email"], session["password"], twofa, chat_id)
+    send_message(
+        t("completed", chat_id,
+          username=username,
+          email=session['email'],
+          password=session['password'],
+          twofa=twofa,
+          price=price),
+        chat_id, reply_markup=next_or_cancel_keyboard(chat_id)
+    )
     clear_session(chat_id)
 
 def process_follow_no(chat_id):
@@ -1199,6 +1345,12 @@ def process_update(update):
             if text.startswith("🔧 Maintenance"):
                 admin_toggle_maintenance(chat_id)
                 return
+            if text == "📁 Created Accounts":
+                admin_list_created_accounts(chat_id)
+                return
+            if text == "📥 Export Excel":
+                admin_export_excel(chat_id)
+                return
             if text == "🔙 Main Menu":
                 send_message("Main Menu", chat_id, reply_markup=main_keyboard(chat_id))
                 return
@@ -1228,9 +1380,6 @@ def process_update(update):
 
         if text == "🌐 Language":
             change_language(chat_id)
-            return
-        if text == "🔐 Enter 2FA" or text == "🔐 2FA দিন":
-            prompt_twofa(chat_id)
             return
         if text == "❌ Cancel" or text == "❌ বাতিল":
             clear_session(chat_id)
@@ -1266,6 +1415,7 @@ def process_update(update):
             withdraw_request(chat_id, "nagad")
             return
 
+        # Session processing
         if session:
             if session.get("withdraw_step") == "account":
                 process_withdraw_account(chat_id, text)
@@ -1273,9 +1423,14 @@ def process_update(update):
             if session.get("withdraw_step") == "amount":
                 process_withdraw_amount(chat_id, text)
                 return
-            if session.get("active") and session.get("step") == "twofa_input":
-                process_twofa(chat_id, text)
-                return
+            if session.get("active"):
+                step = session.get("step")
+                if step == "username_input":
+                    process_username(chat_id, text)
+                    return
+                if step == "twofa":
+                    process_twofa(chat_id, text)
+                    return
 
         send_message(t("unknown", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
 
@@ -1313,6 +1468,14 @@ def process_update(update):
             lang = get_lang(chat_id)
             msg = "📋 Withdraw list closed." if lang == "en" else "📋 উইথড্র তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
+        elif data.startswith("capage_"):
+            page = int(data.split("_")[1])
+            admin_list_created_accounts(chat_id, page=page, message_id=message_id)
+        elif data == "close_calist":
+            delete_message(chat_id, message_id)
+            lang = get_lang(chat_id)
+            msg = "📁 Created accounts list closed." if lang == "en" else "📁 তৈরি অ্যাকাউন্টের তালিকা বন্ধ করা হয়েছে।"
+            send_message(msg, chat_id, reply_markup=admin_keyboard())
 
 # ================== FLASK ==================
 @app.route("/")
@@ -1322,7 +1485,7 @@ def home():
 # ================== MAIN ==================
 if __name__ == "__main__":
     load_all()
-    logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials")
+    logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
     auto_restore_from_channel()
     threading.Thread(target=auto_backup_loop, daemon=True).start()
     threading.Thread(target=handle_updates, daemon=True).start()
