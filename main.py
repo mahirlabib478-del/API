@@ -92,6 +92,9 @@ def load_all():
     credentials = load_json(CREDENTIALS_FILE, [])
     withdraw_requests = load_json(WITHDRAWS_FILE, [])
     created_accounts = load_json(CREATED_ACCOUNTS_FILE, [])
+    # Ensure created_accounts is a list
+    if not isinstance(created_accounts, list):
+        created_accounts = []
     user_balances = load_json(USER_BALANCES_FILE, {})
     user_info = load_json(USER_INFO_FILE, {})
     user_language = load_json(LANGUAGE_FILE, {})
@@ -402,7 +405,6 @@ def work_start_keyboard(chat_id):
         "resize_keyboard": True
     }
 
-# ================== NEW: USERNAME INPUT KEYBOARD ==================
 def username_input_keyboard(chat_id):
     lang = get_lang(chat_id)
     return {
@@ -1008,8 +1010,15 @@ def process_restore_file(chat_id, file_content):
         send_message("❌ Restore failed. Invalid file format.", chat_id, reply_markup=admin_keyboard())
     clear_session(chat_id)
 
+# ================== FIXED: CREATED ACCOUNTS LIST ==================
 def admin_list_created_accounts(chat_id, page=0, message_id=None):
     try:
+        # Ensure created_accounts is a list
+        if not isinstance(created_accounts, list):
+            logger.error(f"created_accounts is not a list: {type(created_accounts)}")
+            created_accounts.clear()
+            save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+
         total = len(created_accounts)
         logger.info(f"admin_list_created_accounts called, total: {total}")
         if total == 0:
@@ -1026,13 +1035,19 @@ def admin_list_created_accounts(chat_id, page=0, message_id=None):
         lang = get_lang(chat_id)
         lines = [t("created_accounts_list", chat_id, page=page+1, total_pages=total_pages)]
         for acc in page_items:
-            time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%d/%m %H:%M")
+            # Safety: ensure each item has the required keys
+            username = acc.get("username", "N/A")
+            email = acc.get("email", "N/A")
+            password = acc.get("password", "N/A")
+            twofa = acc.get("twofa", "N/A")
+            user_id = acc.get("user_id", "N/A")
+            time_str = datetime.fromtimestamp(acc.get("timestamp", time.time())).strftime("%d/%m %H:%M")
             lines.append(t("created_account_item", chat_id,
-                           username=acc["username"],
-                           email=acc["email"],
-                           password=acc["password"],
-                           twofa=acc["twofa"],
-                           user_id=acc["user_id"],
+                           username=username,
+                           email=email,
+                           password=password,
+                           twofa=twofa,
+                           user_id=user_id,
                            time=time_str))
         text = "\n".join(lines)
         kb = {"inline_keyboard": []}
@@ -1050,7 +1065,9 @@ def admin_list_created_accounts(chat_id, page=0, message_id=None):
             send_message(text, chat_id, reply_markup=kb)
     except Exception as e:
         logger.error(f"Error in admin_list_created_accounts: {e}")
-        send_message("❌ An error occurred while fetching created accounts.", chat_id, reply_markup=admin_keyboard())
+        import traceback
+        traceback.print_exc()
+        send_message("❌ An error occurred while fetching created accounts. Please check logs.", chat_id, reply_markup=admin_keyboard())
 
 def admin_export_excel(chat_id):
     if not created_accounts:
@@ -1123,13 +1140,12 @@ def start_work(chat_id):
         "twofa": None
     })
     send_message(t("account_assigned", chat_id, email=cred["email"], password=cred["password"]),
-                 chat_id, reply_markup=username_input_keyboard(chat_id))  # New keyboard
+                 chat_id, reply_markup=username_input_keyboard(chat_id))
 
 def process_username(chat_id, text):
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "username_input":
         return False
-    # Ensure the user didn't just click the button again
     if text in ["👤 Enter Username", "👤 ইউজারনেম দিন"]:
         send_message(t("enter_username_prompt", chat_id), chat_id)
         return True
@@ -1434,7 +1450,6 @@ def process_update(update):
             if session.get("active"):
                 step = session.get("step")
                 if step == "username_input":
-                    # If user clicks the username button, prompt them
                     if text in ["👤 Enter Username", "👤 ইউজারনেম দিন"]:
                         send_message(t("enter_username_prompt", chat_id), chat_id)
                         return
