@@ -35,17 +35,17 @@ credentials = []
 withdraw_requests = []
 config = {
     "base_balance": 10.0,
-    "channel_id": CHANNEL_ID,  # Set from hardcoded value
+    "channel_id": CHANNEL_ID,
     "maintenance_mode": False,
     "work_rules_en": "📱 **Instagram Account Opening Guidelines**\n\n"
                      "1️⃣ You will receive an email and password.\n"
                      "2️⃣ Enter 2FA code if required.\n"
-                     "3️⃣ Follow 5 profiles.\n"
+                     "3️⃣ Follow 5 profiles and set profile picture.\n"
                      "4️⃣ Upon completion, your balance will be credited.",
     "work_rules_bn": "📱 **Instagram অ্যাকাউন্ট খোলার নিয়মাবলী**\n\n"
                      "1️⃣ আপনি একটি ইমেইল ও পাসওয়ার্ড পাবেন।\n"
                      "2️⃣ 2FA কোড দিন (যদি থাকে)।\n"
-                     "3️⃣ ৫টি প্রোফাইল ফলো করুন।\n"
+                     "3️⃣ ৫টি প্রোফাইল ফলো করুন ও প্রোফাইল পিক সেট করুন।\n"
                      "4️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে।"
 }
 user_balances = {}
@@ -94,7 +94,6 @@ def load_all():
             cfg[k] = config[k]
     config = cfg
     
-    # Ensure channel_id is set even if config file is missing
     if not config.get("channel_id"):
         config["channel_id"] = CHANNEL_ID
         save_json(CONFIG_FILE, config)
@@ -186,7 +185,6 @@ def set_lang(user_id, lang):
     save_json(LANGUAGE_FILE, user_language)
 
 def t(key, user_id, **kwargs):
-    """Translation function - use kwargs for dynamic values"""
     lang = get_lang(user_id)
     translations = {
         "en": {
@@ -200,8 +198,8 @@ def t(key, user_id, **kwargs):
             "invalid_amount": "❌ **Enter a valid amount.**",
             "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\n🔐 Press the button below to enter your 2FA code:",
             "twofa_prompt": "🔐 **Please enter your 2FA code:**",
-            "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles & set profile picture**. Have you followed them & set profile picture?",
-            "follow_yes": "⚠️ **Please follow 5 profiles & set profile picture** and then press **Yes**.",
+            "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles & set profile picture**. Have you done that?",
+            "follow_yes": "⚠️ **Please follow 5 profiles & set profile picture** then press **Yes**.",
             "completed": "🎉 **Congratulations! Account opening completed!**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** BDT added to your balance.",
             "no_accounts": "❌ **No available accounts!** Please contact admin.",
             "active_session": "⏳ You already have an active session. Please finish or cancel it.",
@@ -222,7 +220,7 @@ def t(key, user_id, **kwargs):
             "stats": "📊 **Statistics**\n\n👥 Users: {users}\n📦 Credentials: {total} (Used: {used})\n💸 Pending Withdraw: {pending}\n💰 Price per account: {price} BDT",
             "no_pending": "📭 **No pending withdraw requests.**",
             "pending_withdraws": "📥 **Pending Withdraw Requests**\n\n",
-            "pending_item": "🆔 `{id}` | 👤 `{user}` | 💰 `{amount}` | 💳 {method}",
+            "pending_item": "🆔 `{id}`\n👤 User: `{user}`\n💰 Amount: `{amount}` BDT\n💳 Method: {method}\n📞 Account: `{account}`\n🕒 Time: {time}\n",
             "approve_success": "✅ **Withdraw {w_id} approved.**",
             "reject_success": "❌ **Withdraw {w_id} rejected.**",
             "not_found": "❌ {w_id} not found.",
@@ -245,8 +243,8 @@ def t(key, user_id, **kwargs):
             "invalid_amount": "❌ **সঠিক টাকার পরিমাণ দিন।**",
             "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\n🔐 নিচের বাটনে ক্লিক করে 2FA কোড দিন:",
             "twofa_prompt": "🔐 **2FA কোড দিন:**",
-            "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো আর প্রোফাইল পিক সেট** করুন। ফলো আর প্রোফাইল পিক সেট করেছেন?",
-            "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো করুন আর প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
+            "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
+            "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
             "completed": "🎉 **অভিনন্দন! অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।",
             "no_accounts": "❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!** অ্যাডমিনের সাথে যোগাযোগ করুন।",
             "active_session": "⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।",
@@ -267,7 +265,7 @@ def t(key, user_id, **kwargs):
             "stats": "📊 **পরিসংখ্যান**\n\n👥 ইউজার: {users}\n📦 ক্রেডেনশিয়াল: {total} (ব্যবহৃত: {used})\n💸 পেন্ডিং উইথড্র: {pending}\n💰 প্রতি অ্যাকাউন্ট মূল্য: {price} টাকা",
             "no_pending": "📭 **কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই।**",
             "pending_withdraws": "📥 **পেন্ডিং উইথড্র রিকোয়েস্ট**\n\n",
-            "pending_item": "🆔 `{id}` | 👤 `{user}` | 💰 `{amount}` | 💳 {method}",
+            "pending_item": "🆔 `{id}`\n👤 ইউজার: `{user}`\n💰 পরিমাণ: `{amount}` টাকা\n💳 মাধ্যম: {method}\n📞 অ্যাকাউন্ট: `{account}`\n🕒 সময়: {time}\n",
             "approve_success": "✅ **উইথড্র {w_id} অনুমোদিত হয়েছে।**",
             "reject_success": "❌ **উইথড্র {w_id} বাতিল করা হয়েছে।**",
             "not_found": "❌ {w_id} পাওয়া যায়নি।",
@@ -280,7 +278,6 @@ def t(key, user_id, **kwargs):
             "restoring": "⏳ **ডেটা রিস্টোর করা হচ্ছে...**",
         }
     }
-    
     text = translations.get(lang, translations["en"]).get(key, key)
     if kwargs:
         text = text.format(**kwargs)
@@ -456,7 +453,6 @@ def cleanup_old_channel_backup():
         logger.error(f"Backup cleanup error: {e}")
 
 def generate_backup_data():
-    """Generate backup data without sending to channel"""
     with data_lock:
         return {
             "subscribed_users": list(subscribed_users),
@@ -555,53 +551,38 @@ def save_data_to_channel():
             logger.error(f"Backup error: {e}")
 
 def manual_backup(chat_id):
-    """Manual backup - sends the backup file directly to admin"""
     try:
         data = generate_backup_data()
         json_bytes = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
         compressed = gzip.compress(json_bytes, compresslevel=6)
-        
         filename = f"backup_manual_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json.gz"
         resp = send_document(compressed, filename, chat_id, caption=t("backup_created", chat_id))
-        
-        if resp and resp.status_code == 200:
-            return True
-        return False
+        return resp and resp.status_code == 200
     except Exception as e:
         logger.error(f"Manual backup error: {e}")
         return False
 
 def manual_restore(chat_id, file_content):
-    """Manual restore from uploaded file"""
     try:
         decompressed = gzip.decompress(file_content)
         data = json.loads(decompressed.decode('utf-8'))
-        
         with data_lock:
             subscribed_users.clear()
             subscribed_users.update(data.get("subscribed_users", []))
-            
             credentials.clear()
             credentials.extend(data.get("credentials", []))
-            
             withdraw_requests.clear()
             withdraw_requests.extend(data.get("withdraw_requests", []))
-            
             if "config" in data:
                 for k in data["config"]:
                     config[k] = data["config"][k]
-            
             user_balances.clear()
             user_balances.update(data.get("user_balances", {}))
-            
             user_info.clear()
             user_info.update(data.get("user_info", {}))
-            
             user_language.clear()
             user_language.update(data.get("user_language", {}))
-            
             save_all()
-        
         logger.info(f"Manual restore completed: {len(subscribed_users)} users, {len(credentials)} credentials")
         return True
     except Exception as e:
@@ -704,7 +685,7 @@ def auto_restore_from_channel():
 
 def auto_backup_loop():
     while True:
-        time.sleep(300)  # Every 5 minutes
+        time.sleep(300)
         save_data_to_channel()
 
 # ================== ADMIN FUNCTIONS ==================
@@ -722,47 +703,32 @@ def admin_add_creds_prompt(chat_id):
 def process_admin_creds_email(chat_id, text):
     if chat_id not in admin_cred_upload_session or admin_cred_upload_session[chat_id].get("step") != "email":
         return False
-    
     emails = [line.strip() for line in text.strip().splitlines() if line.strip()]
     valid_emails = [e for e in emails if '@' in e]
-    
     if not valid_emails:
         send_message(t("no_valid_emails", chat_id), chat_id)
         return True
-    
     admin_cred_upload_session[chat_id]["emails"] = valid_emails
     admin_cred_upload_session[chat_id]["step"] = "password"
-    
     send_message(t("enter_password", chat_id), chat_id)
     return True
 
 def process_admin_creds_password(chat_id, text):
     if chat_id not in admin_cred_upload_session or admin_cred_upload_session[chat_id].get("step") != "password":
         return False
-    
     password = text.strip()
     if not password:
         send_message(t("password_empty", chat_id), chat_id)
         return True
-    
     emails = admin_cred_upload_session[chat_id]["emails"]
     added = 0
     with data_lock:
         for email in emails:
-            credentials.append({
-                "email": email,
-                "password": password,
-                "used": False,
-                "assigned_to": None
-            })
+            credentials.append({"email": email, "password": password, "used": False, "assigned_to": None})
             added += 1
         save_all()
-    
     del admin_cred_upload_session[chat_id]
-    send_message(
-        t("add_accounts_success", chat_id, added=added, total=len(credentials)),
-        chat_id, reply_markup=admin_keyboard()
-    )
+    send_message(t("add_accounts_success", chat_id, added=added, total=len(credentials)), chat_id, reply_markup=admin_keyboard())
     return True
 
 def admin_list_creds(chat_id, page=0, message_id=None):
@@ -772,34 +738,25 @@ def admin_list_creds(chat_id, page=0, message_id=None):
         msg = "📭 **No credentials available.**" if lang == "en" else "📭 **কোনো ক্রেডেনশিয়াল নেই।**"
         send_message(msg, chat_id, reply_markup=admin_keyboard())
         return
-
     per_page = 10
     total_pages = (total + per_page - 1) // per_page
     page = max(0, min(page, total_pages - 1))
     start = page * per_page
     end = min(start + per_page, total)
     page_items = credentials[start:end]
-
     lang = get_lang(chat_id)
     lines = [t("account_list", chat_id, page=page+1, total_pages=total_pages)]
-    
-    status_text = {
-        "en": {"used": "🔴 Used ({user})", "unused": "🟢 Unused"},
-        "bn": {"used": "🔴 ব্যবহৃত ({user})", "unused": "🟢 অব্যবহৃত"}
-    }
+    status_text = {"en": {"used": "🔴 Used ({user})", "unused": "🟢 Unused"},
+                   "bn": {"used": "🔴 ব্যবহৃত ({user})", "unused": "🟢 অব্যবহৃত"}}
     st = status_text.get(lang, status_text["en"])
-
     for idx, cred in enumerate(page_items, start=start):
         if cred.get("used", False):
             status = st["used"].format(user=cred.get("assigned_to", "N/A"))
         else:
             status = st["unused"]
         lines.append(f"`{cred['email']}` | `{cred['password']}` | {status}")
-
     text = "\n".join(lines)
     kb = {"inline_keyboard": []}
-
-    # Navigation
     nav = []
     if page > 0:
         nav.append({"text": "⬅️ Previous" if lang == "en" else "⬅️ আগের", "callback_data": f"credp_{page-1}"})
@@ -807,15 +764,9 @@ def admin_list_creds(chat_id, page=0, message_id=None):
         nav.append({"text": "Next ➡️" if lang == "en" else "পরের ➡️", "callback_data": f"credp_{page+1}"})
     if nav:
         kb["inline_keyboard"].append(nav)
-
-    # Delete buttons per item
     for i, cred in enumerate(page_items, start=start):
-        kb["inline_keyboard"].append([
-            {"text": f"🗑️ {i+1}. {cred['email']}", "callback_data": f"delc_{i}"}
-        ])
-
+        kb["inline_keyboard"].append([{"text": f"🗑️ {i+1}. {cred['email']}", "callback_data": f"delc_{i}"}])
     kb["inline_keyboard"].append([{"text": "🔙 Close" if lang == "en" else "🔙 বন্ধ", "callback_data": "close_list"}])
-
     if message_id:
         edit_message_text(chat_id, message_id, text, reply_markup=kb)
     else:
@@ -852,15 +803,46 @@ def admin_stats(chat_id):
         chat_id, reply_markup=admin_keyboard()
     )
 
-def admin_show_withdraw_requests(chat_id):
+def admin_show_withdraw_requests(chat_id, page=0, message_id=None):
     pending = [w for w in withdraw_requests if w["status"] == "pending"]
     if not pending:
         send_message(t("no_pending", chat_id), chat_id, reply_markup=admin_keyboard())
         return
+    per_page = 5
+    total_pages = (len(pending) + per_page - 1) // per_page
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    end = min(start + per_page, total)
+    page_items = pending[start:end]
+    lang = get_lang(chat_id)
     msg = t("pending_withdraws", chat_id)
-    for w in pending:
-        msg += t("pending_item", chat_id, id=w['id'], user=w['user_id'], amount=w['amount'], method=w['method'].upper()) + "\n"
-    send_message(msg, chat_id)
+    for w in page_items:
+        time_str = datetime.fromtimestamp(w['timestamp']).strftime("%d/%m %H:%M")
+        msg += t("pending_item", chat_id,
+                 id=w['id'],
+                 user=w['user_id'],
+                 amount=w['amount'],
+                 method=w['method'].upper(),
+                 account=w['account'],
+                 time=time_str) + "\n"
+    kb = {"inline_keyboard": []}
+    for w in page_items:
+        kb["inline_keyboard"].append([
+            {"text": f"✅ Approve {w['id'][:6]}", "callback_data": f"appw_{w['id']}"},
+            {"text": f"❌ Reject {w['id'][:6]}", "callback_data": f"rejw_{w['id']}"}
+        ])
+    nav = []
+    if page > 0:
+        nav.append({"text": "⬅️ Previous" if lang == "en" else "⬅️ আগের", "callback_data": f"wpage_{page-1}"})
+    if page < total_pages - 1:
+        nav.append({"text": "Next ➡️" if lang == "en" else "পরের ➡️", "callback_data": f"wpage_{page+1}"})
+    if nav:
+        kb["inline_keyboard"].append(nav)
+    kb["inline_keyboard"].append([{"text": "🔙 Close" if lang == "en" else "🔙 বন্ধ", "callback_data": "close_withdraw"}])
+    if message_id:
+        edit_message_text(chat_id, message_id, msg, reply_markup=kb)
+    else:
+        send_message(msg, chat_id, reply_markup=kb)
 
 def admin_approve_withdraw(chat_id, w_id):
     with data_lock:
@@ -946,11 +928,7 @@ def admin_backup(chat_id):
 def admin_restore(chat_id):
     lang = get_lang(chat_id)
     msg = "📥 **Restore from file**\n\nPlease upload the `.json.gz` backup file." if lang == "en" else "📥 **ফাইল থেকে রিস্টোর**\n\nদয়া করে `.json.gz` ব্যাকআপ ফাইল আপলোড করুন।"
-    send_message(
-        msg,
-        chat_id,
-        reply_markup={"keyboard": [["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True}
-    )
+    send_message(msg, chat_id, reply_markup={"keyboard": [["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True})
     set_session(chat_id, {"restore_mode": True})
 
 def process_restore_file(chat_id, file_content):
@@ -974,7 +952,6 @@ def start_command(chat_id, chat_type="private"):
     if uid not in user_language:
         user_language[uid] = "en"
         save_json(LANGUAGE_FILE, user_language)
-    
     if chat_type == "private":
         send_message(t("welcome", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
     else:
@@ -997,10 +974,7 @@ def instagram_work(chat_id):
         send_message(t("active_session", chat_id), chat_id)
         return
     rules = config.get("work_rules_en" if get_lang(chat_id) == "en" else "work_rules_bn", "")
-    send_message(
-        t("work", chat_id, rules=rules),
-        chat_id, reply_markup=work_start_keyboard(chat_id)
-    )
+    send_message(t("work", chat_id, rules=rules), chat_id, reply_markup=work_start_keyboard(chat_id))
 
 def start_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
@@ -1011,18 +985,8 @@ def start_work(chat_id):
         send_message(t("no_accounts", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
         return
     assign_credential_to_user(cred, chat_id)
-    set_session(chat_id, {
-        "active": True,
-        "step": "credentials_shown",
-        "email": cred["email"],
-        "password": cred["password"],
-        "twofa": None
-    })
-    
-    send_message(
-        t("account_assigned", chat_id, email=cred["email"], password=cred["password"]),
-        chat_id, reply_markup=twofa_reply_keyboard(chat_id)
-    )
+    set_session(chat_id, {"active": True, "step": "credentials_shown", "email": cred["email"], "password": cred["password"], "twofa": None})
+    send_message(t("account_assigned", chat_id, email=cred["email"], password=cred["password"]), chat_id, reply_markup=twofa_reply_keyboard(chat_id))
 
 def prompt_twofa(chat_id):
     session = get_session(chat_id)
@@ -1030,25 +994,16 @@ def prompt_twofa(chat_id):
         return
     session["step"] = "twofa_input"
     set_session(chat_id, session)
-    
-    send_message(
-        t("twofa_prompt", chat_id),
-        chat_id, reply_markup=cancel_keyboard(chat_id)
-    )
+    send_message(t("twofa_prompt", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
 
 def process_twofa(chat_id, text):
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "twofa_input":
         return False
-    
     session["twofa"] = text.strip()
     session["step"] = "follow"
     set_session(chat_id, session)
-    
-    send_message(
-        t("twofa_verified", chat_id),
-        chat_id, reply_markup=yes_no_keyboard(chat_id)
-    )
+    send_message(t("twofa_verified", chat_id), chat_id, reply_markup=yes_no_keyboard(chat_id))
     return True
 
 def process_follow_yes(chat_id):
@@ -1063,18 +1018,14 @@ def process_follow_yes(chat_id):
     if uid in user_info:
         user_info[uid]["total_accounts"] = user_info[uid].get("total_accounts", 0) + 1
         save_json(USER_INFO_FILE, user_info)
-    send_message(
-        t("completed", chat_id, email=session['email'], password=session['password'], twofa=session.get('twofa', 'N/A'), price=price),
-        chat_id, reply_markup=next_or_cancel_keyboard(chat_id)
-    )
+    send_message(t("completed", chat_id, email=session['email'], password=session['password'], twofa=session.get('twofa', 'N/A'), price=price), chat_id, reply_markup=next_or_cancel_keyboard(chat_id))
     clear_session(chat_id)
 
 def process_follow_no(chat_id):
     send_message(t("follow_yes", chat_id), chat_id, reply_markup=yes_no_keyboard(chat_id))
 
 def show_balance(chat_id):
-    text = get_balance_text(chat_id)
-    send_message(text, chat_id)
+    send_message(get_balance_text(chat_id), chat_id)
 
 def withdraw_start(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
@@ -1088,10 +1039,7 @@ def withdraw_request(chat_id, method):
         send_message(t("under_maintenance", chat_id), chat_id)
         return
     set_session(chat_id, {"withdraw_step": "account", "method": method})
-    send_message(
-        t("enter_account", chat_id, method=method.upper()),
-        chat_id, reply_markup=cancel_keyboard(chat_id)
-    )
+    send_message(t("enter_account", chat_id, method=method.upper()), chat_id, reply_markup=cancel_keyboard(chat_id))
 
 def process_withdraw_account(chat_id, text):
     session = get_session(chat_id)
@@ -1100,10 +1048,7 @@ def process_withdraw_account(chat_id, text):
     session["account"] = text.strip()
     session["withdraw_step"] = "amount"
     set_session(chat_id, session)
-    send_message(
-        t("enter_amount", chat_id),
-        chat_id, reply_markup=cancel_keyboard(chat_id)
-    )
+    send_message(t("enter_amount", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
     return True
 
 def process_withdraw_amount(chat_id, text):
@@ -1129,10 +1074,7 @@ def process_withdraw_amount(chat_id, text):
     })
     deduct_balance(chat_id, amount)
     save_all()
-    send_message(
-        t("withdraw_submitted", chat_id, w_id=w_id, amount=amount),
-        chat_id, reply_markup=main_keyboard(chat_id)
-    )
+    send_message(t("withdraw_submitted", chat_id, w_id=w_id, amount=amount), chat_id, reply_markup=main_keyboard(chat_id))
     lang = get_lang(chat_id)
     admin_msg = f"📥 **New Withdraw Request**\n🆔 `{w_id}`\n👤 User: `{chat_id}`\n💰 {amount} BDT\n💳 {session['method'].upper()}\n📞 {session['account']}"
     if lang == "bn":
@@ -1182,14 +1124,12 @@ def process_update(update):
 
         # ===== ADMIN SECTION =====
         if chat_id == ADMIN_CHAT_ID:
-            # Check if in restore mode
             session = get_session(chat_id)
             if session and session.get("restore_mode"):
                 if text == "❌ Cancel" or text == "❌ বাতিল":
                     clear_session(chat_id)
                     send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
                     return
-                # Check if document uploaded
                 if "document" in msg:
                     file_obj = msg["document"]
                     if file_obj.get("file_name", "").endswith(".json.gz"):
@@ -1210,13 +1150,11 @@ def process_update(update):
                         send_message("❌ Please upload a `.json.gz` file.", chat_id)
                     return
 
-            # Admin upload session
             if chat_id in admin_cred_upload_session:
                 if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
                     del admin_cred_upload_session[chat_id]
                     send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
                     return
-                
                 step = admin_cred_upload_session[chat_id].get("step")
                 if step == "email":
                     process_admin_creds_email(chat_id, text)
@@ -1283,24 +1221,18 @@ def process_update(update):
 
         # ===== USER SECTION =====
         session = get_session(chat_id)
-        
-        # Language change
+
         if text == "🌐 Language":
             change_language(chat_id)
             return
-        
-        # 2FA button (reply keyboard)
         if text == "🔐 Enter 2FA" or text == "🔐 2FA দিন":
             prompt_twofa(chat_id)
             return
-
-        # Cancel
         if text == "❌ Cancel" or text == "❌ বাতিল":
             clear_session(chat_id)
             send_message(t("cancelled", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
             return
 
-        # Main menu
         if text == "📱 Instagram Work":
             instagram_work(chat_id)
             return
@@ -1310,8 +1242,6 @@ def process_update(update):
         if text == "💸 Withdraw":
             withdraw_start(chat_id)
             return
-        
-        # Work flow
         if text == "🚀 Start" or text == "🚀 শুরু করুন":
             start_work(chat_id)
             return
@@ -1325,8 +1255,6 @@ def process_update(update):
             clear_session(chat_id)
             instagram_work(chat_id)
             return
-        
-        # Withdraw methods
         if text == "💸 bKash":
             withdraw_request(chat_id, "bkash")
             return
@@ -1334,7 +1262,6 @@ def process_update(update):
             withdraw_request(chat_id, "nagad")
             return
 
-        # Session steps
         if session:
             if session.get("withdraw_step") == "account":
                 process_withdraw_account(chat_id, text)
@@ -1346,7 +1273,6 @@ def process_update(update):
                 process_twofa(chat_id, text)
                 return
 
-        # Unknown text
         send_message(t("unknown", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
 
     elif "callback_query" in update:
@@ -1367,6 +1293,23 @@ def process_update(update):
             lang = get_lang(chat_id)
             msg = "📋 List closed." if lang == "en" else "📋 তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
+        elif data.startswith("appw_"):
+            w_id = data[5:]
+            admin_approve_withdraw(chat_id, w_id)
+            # Refresh the list after action
+            admin_show_withdraw_requests(chat_id, page=0, message_id=message_id)
+        elif data.startswith("rejw_"):
+            w_id = data[5:]
+            admin_reject_withdraw(chat_id, w_id)
+            admin_show_withdraw_requests(chat_id, page=0, message_id=message_id)
+        elif data.startswith("wpage_"):
+            page = int(data.split("_")[1])
+            admin_show_withdraw_requests(chat_id, page=page, message_id=message_id)
+        elif data == "close_withdraw":
+            delete_message(chat_id, message_id)
+            lang = get_lang(chat_id)
+            msg = "📋 Withdraw list closed." if lang == "en" else "📋 উইথড্র তালিকা বন্ধ করা হয়েছে।"
+            send_message(msg, chat_id, reply_markup=admin_keyboard())
 
 # ================== FLASK ==================
 @app.route("/")
@@ -1377,13 +1320,8 @@ def home():
 if __name__ == "__main__":
     load_all()
     logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials")
-
-    # Auto restore from channel on startup
     auto_restore_from_channel()
-
-    # Start background threads
     threading.Thread(target=auto_backup_loop, daemon=True).start()
     threading.Thread(target=handle_updates, daemon=True).start()
-
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, threaded=True)
