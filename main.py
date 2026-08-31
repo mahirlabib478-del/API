@@ -803,13 +803,16 @@ def admin_stats(chat_id):
         chat_id, reply_markup=admin_keyboard()
     )
 
+# ================== FIXED FUNCTION ==================
 def admin_show_withdraw_requests(chat_id, page=0, message_id=None):
     pending = [w for w in withdraw_requests if w["status"] == "pending"]
     if not pending:
         send_message(t("no_pending", chat_id), chat_id, reply_markup=admin_keyboard())
         return
+    
     per_page = 5
-    total_pages = (len(pending) + per_page - 1) // per_page
+    total = len(pending)  # 🔥 FIX: added this line
+    total_pages = (total + per_page - 1) // per_page
     page = max(0, min(page, total_pages - 1))
     start = page * per_page
     end = min(start + per_page, total)
@@ -844,6 +847,7 @@ def admin_show_withdraw_requests(chat_id, page=0, message_id=None):
     else:
         send_message(msg, chat_id, reply_markup=kb)
 
+# ================== ADMIN FUNCTIONS (continued) ==================
 def admin_approve_withdraw(chat_id, w_id):
     with data_lock:
         for w in withdraw_requests:
@@ -1296,7 +1300,6 @@ def process_update(update):
         elif data.startswith("appw_"):
             w_id = data[5:]
             admin_approve_withdraw(chat_id, w_id)
-            # Refresh the list after action
             admin_show_withdraw_requests(chat_id, page=0, message_id=message_id)
         elif data.startswith("rejw_"):
             w_id = data[5:]
