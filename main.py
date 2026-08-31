@@ -45,7 +45,7 @@ config = {
 user_balances = {}
 user_info = {}
 
-admin_cred_upload_session = {}  # { chat_id: {"step": "email"|"password", "emails": [...]} }
+admin_cred_upload_session = {}
 admin_cred_list_page = {}
 last_backup_message_id = None
 last_backup_part_ids = []
@@ -164,6 +164,28 @@ def edit_message_text(chat_id, message_id, text, reply_markup=None):
         logger.error(f"এডিট error: {e}")
         return None
 
+# ================== ইন্সটাগ্রাম অ্যাকাউন্ট ক্রিয়েট (সিমুলেটেড) ==================
+def create_instagram_account(email, password):
+    """
+    ইন্সটাগ্রাম অ্যাকাউন্ট তৈরির সিমুলেশন
+    আসলে এটি ব্রাউজারের মাধ্যমে ইন্সটাগ্রামে লগইন করে অ্যাকাউন্ট তৈরি করবে
+    """
+    try:
+        # এটি একটি সিমুলেশন - আসলে ইন্সটাগ্রামে অ্যাকাউন্ট তৈরি করা জটিল
+        # আপনি চাইলে এখানে Selenium বা Playwright ব্যবহার করতে পারেন
+        time.sleep(3)  # নেটওয়ার্ক ডেলি
+        
+        # সিমুলেটেড সফলতা
+        return {
+            "success": True,
+            "message": f"অ্যাকাউন্ট তৈরি সফল! ইমেইল: {email}"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"অ্যাকাউন্ট তৈরি ব্যর্থ: {str(e)}"
+        }
+
 # ================== ব্যালেন্স ও প্রোফাইল ==================
 def add_balance(user_id, amount):
     with data_lock:
@@ -227,6 +249,14 @@ def work_start_keyboard():
         ]
     }
 
+def twofa_button_keyboard():
+    return {
+        "inline_keyboard": [
+            [{"text": "🔐 2FA দিন", "callback_data": "twofa_prompt"}],
+            [{"text": "❌ বাতিল করুন", "callback_data": "work_cancel"}]
+        ]
+    }
+
 def yes_no_keyboard():
     return {
         "inline_keyboard": [
@@ -258,18 +288,6 @@ def withdraw_method_keyboard():
             [{"text": "❌ বাতিল", "callback_data": "withdraw_cancel"}]
         ]
     }
-
-def get_cred_list_keyboard(page, total_pages):
-    kb = {"inline_keyboard": []}
-    nav = []
-    if page > 0:
-        nav.append({"text": "⬅️ আগের", "callback_data": f"credpage_{page-1}"})
-    if page < total_pages - 1:
-        nav.append({"text": "➡️ পরের", "callback_data": f"credpage_{page+1}"})
-    if nav:
-        kb["inline_keyboard"].append(nav)
-    kb["inline_keyboard"].append([{"text": "🔙 বন্ধ করুন", "callback_data": "close_credlist"}])
-    return kb
 
 # ================== ক্রেডেনশিয়াল ==================
 def get_available_credential():
@@ -429,7 +447,7 @@ def save_data_to_channel():
 
 def auto_backup_loop():
     while True:
-        time.sleep(300)  # প্রতি ৫ মিনিট
+        time.sleep(300)
         save_data_to_channel()
 
 def auto_restore_from_channel():
@@ -529,7 +547,6 @@ def auto_restore_from_channel():
 def admin_panel(chat_id):
     send_message("⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**", chat_id, reply_markup=admin_keyboard())
 
-# ===== অ্যাকাউন্ট যোগ (ইমেইল → পাসওয়ার্ড) =====
 def admin_add_creds_prompt(chat_id):
     admin_cred_upload_session[chat_id] = {"step": "email"}
     send_message(
@@ -549,11 +566,10 @@ def process_admin_creds_email(chat_id, text):
         return False
     
     emails = [line.strip() for line in text.strip().splitlines() if line.strip()]
-    # সাধারণ ভ্যালিডেশন: @ আছে কিনা
     valid_emails = [e for e in emails if '@' in e]
     
     if not valid_emails:
-        send_message("❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**\nআবার চেষ্টা করুন।", chat_id)
+        send_message("❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**", chat_id)
         return True
     
     invalid_count = len(emails) - len(valid_emails)
@@ -574,7 +590,7 @@ def process_admin_creds_password(chat_id, text):
     
     password = text.strip()
     if not password:
-        send_message("❌ **পাসওয়ার্ড খালি রাখা যাবে না।**\nআবার দিন।", chat_id)
+        send_message("❌ **পাসওয়ার্ড খালি রাখা যাবে না।**", chat_id)
         return True
     
     emails = admin_cred_upload_session[chat_id]["emails"]
@@ -622,7 +638,6 @@ def admin_list_creds(chat_id, page=0, message_id=None):
     text = "\n".join(lines)
     kb = {"inline_keyboard": []}
 
-    # নেভিগেশন
     nav = []
     if page > 0:
         nav.append({"text": "⬅️ আগের", "callback_data": f"credpage_{page-1}"})
@@ -631,7 +646,6 @@ def admin_list_creds(chat_id, page=0, message_id=None):
     if nav:
         kb["inline_keyboard"].append(nav)
 
-    # ডিলিট বাটন (প্রতি আইটেমের জন্য)
     for i, cred in enumerate(page_items, start=start):
         kb["inline_keyboard"].append([
             {"text": f"🗑️ {i+1}. {cred['email']}", "callback_data": f"delcred_{i}"}
@@ -786,10 +800,10 @@ def admin_backup(chat_id):
 def admin_restore(chat_id):
     send_message("⏳ **রিস্টোর করা হচ্ছে...**", chat_id)
     auto_restore_from_channel()
-    send_message("✅ **রিস্টোর সম্পন্ন!** সব ডেটা চ্যানেল থেকে পুনরুদ্ধার করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+    send_message("✅ **রিস্টোর সম্পন্ন!**", chat_id, reply_markup=admin_keyboard())
 
 # ================== ইউজার কমান্ড ==================
-def start_command(chat_id):
+def start_command(chat_id, chat_type="private"):
     if chat_id not in subscribed_users:
         with data_lock:
             subscribed_users.add(chat_id)
@@ -798,12 +812,20 @@ def start_command(chat_id):
     if uid not in user_info:
         user_info[uid] = {"name": f"User_{chat_id}", "total_accounts": 0}
         save_json(USER_INFO_FILE, user_info)
-    send_message(
-        "🤖 **Instagram অ্যাকাউন্ট খোলার বটে স্বাগতম!**\n\n"
-        "আমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\n"
-        "নিচের বাটন ব্যবহার করে শুরু করুন।",
-        chat_id, reply_markup=main_keyboard(chat_id)
-    )
+    
+    if chat_type == "private":
+        send_message(
+            "🤖 **Instagram অ্যাকাউন্ট খোলার বটে স্বাগতম!**\n\n"
+            "আমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\n"
+            "নিচের বাটন ব্যবহার করে শুরু করুন।",
+            chat_id, reply_markup=main_keyboard(chat_id)
+        )
+    else:
+        send_message(
+            "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\n"
+            "আমাকে প্রাইভেট চ্যাটে `/start` দিন অথবা @username দিয়ে সার্চ করুন।",
+            chat_id
+        )
 
 def instagram_work(chat_id):
     if get_session(chat_id) and get_session(chat_id).get("active"):
@@ -822,25 +844,66 @@ def start_work(chat_id):
         send_message("❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!**\nঅ্যাডমিনের সাথে যোগাযোগ করুন।", chat_id, reply_markup=main_keyboard(chat_id))
         return
     assign_credential_to_user(cred, chat_id)
-    set_session(chat_id, {"active": True, "step": "2fa", "email": cred["email"], "password": cred["password"]})
+    set_session(chat_id, {
+        "active": True, 
+        "step": "credentials_shown", 
+        "email": cred["email"], 
+        "password": cred["password"],
+        "twofa": None
+    })
+    
+    # অ্যাকাউন্ট তৈরি করার চেষ্টা
+    result = create_instagram_account(cred["email"], cred["password"])
+    
+    if result["success"]:
+        send_message(
+            f"✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n"
+            f"📧 **ইমেইল:** `{cred['email']}`\n"
+            f"🔑 **পাসওয়ার্ড:** `{cred['password']}`\n\n"
+            f"🔄 অ্যাকাউন্ট তৈরি হচ্ছে...\n\n"
+            f"🔐 **2FA দিন** বাটনে ক্লিক করে 2FA কোড দিন (যদি থাকে):",
+            chat_id, reply_markup=twofa_button_keyboard()
+        )
+    else:
+        send_message(
+            f"❌ অ্যাকাউন্ট তৈরি ব্যর্থ!\n{result['message']}\n\n"
+            f"আবার চেষ্টা করতে **Start** বাটনে ক্লিক করুন।",
+            chat_id, reply_markup=work_start_keyboard()
+        )
+
+def prompt_twofa(chat_id):
+    session = get_session(chat_id)
+    if not session or not session.get("active"):
+        return
+    
+    # 2FA ইনপুট নেওয়ার জন্য স্টেপ পরিবর্তন
+    session["step"] = "twofa_input"
+    set_session(chat_id, session)
+    
     send_message(
-        f"✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n"
-        f"📧 **ইমেইল:** `{cred['email']}`\n"
-        f"🔑 **পাসওয়ার্ড:** `{cred['password']}`\n\n"
-        f"🔐 **2FA কী** দিন (যদি না থাকে তাহলে `0` লিখুন):",
+        "🔐 **2FA কোড দিন:**\n\n"
+        "আপনার ইমেইলে আসা 6-ডিজিটের কোডটি লিখুন।\n"
+        "যদি 2FA না থাকে তাহলে `0` লিখুন।",
         chat_id, reply_markup=cancel_keyboard()
     )
 
-def process_2fa(chat_id, text):
+def process_twofa(chat_id, text):
     session = get_session(chat_id)
-    if not session or not session.get("active") or session.get("step") != "2fa":
+    if not session or not session.get("active") or session.get("step") != "twofa_input":
         return False
-    if text.strip() == "0":
+    
+    twofa_code = text.strip()
+    session["twofa"] = twofa_code
+    
+    # 2FA ভেরিফাই (সিমুলেট)
+    if twofa_code == "0":
         pass
     else:
         time.sleep(1)
+    
     session["step"] = "follow"
     set_session(chat_id, session)
+    
     send_message(
         "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\n"
         "এখন **৫টি প্রোফাইল ফলো** করুন।\n"
@@ -864,7 +927,8 @@ def process_follow_yes(chat_id):
     send_message(
         f"🎉 **অভিনন্দন! আপনার অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n"
         f"📧 **ইমেইল:** `{session['email']}`\n"
-        f"🔑 **পাসওয়ার্ড:** `{session['password']}`\n\n"
+        f"🔑 **পাসওয়ার্ড:** `{session['password']}`\n"
+        f"🔐 **2FA:** {session.get('twofa', 'N/A')}\n\n"
         f"💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।\n\n"
         f"আবার নতুন অ্যাকাউন্ট খুলতে নিচের বাটন চাপুন।",
         chat_id, reply_markup=next_or_cancel()
@@ -972,10 +1036,15 @@ def process_update(update):
     if "message" in update:
         msg = update["message"]
         chat_id = str(msg["chat"]["id"])
+        chat_type = msg["chat"]["type"]
         text = msg.get("text", "").strip()
 
         if text == "/start":
-            start_command(chat_id)
+            start_command(chat_id, chat_type)
+            return
+
+        # গ্রুপে অচেনা টেক্সট ইগনোর
+        if chat_type != "private":
             return
 
         if chat_id not in subscribed_users:
@@ -985,7 +1054,6 @@ def process_update(update):
 
         # ===== অ্যাডমিন =====
         if chat_id == ADMIN_CHAT_ID:
-            # অ্যাকাউন্ট যোগ সেশন হ্যান্ডলিং (ইমেইল -> পাসওয়ার্ড)
             if chat_id in admin_cred_upload_session:
                 if text == "/cancel":
                     del admin_cred_upload_session[chat_id]
@@ -1091,13 +1159,13 @@ def process_update(update):
             if session.get("withdraw_step") == "amount":
                 process_withdraw_amount(chat_id, text)
                 return
-            if session.get("active") and session.get("step") == "2fa":
-                process_2fa(chat_id, text)
+            if session.get("active") and session.get("step") == "twofa_input":
+                process_twofa(chat_id, text)
                 return
 
         send_message(
-            "❌ **আমি বুঝতে পারিনি।**\n"
-            "/start দিন অথবা নিচের বাটন ব্যবহার করুন।",
+            "❌ আমি বুঝতে পারিনি।\n"
+            "দয়া করে /start দিন অথবা নিচের বাটন ব্যবহার করুন।",
             chat_id, reply_markup=main_keyboard(chat_id)
         )
 
@@ -1112,7 +1180,9 @@ def process_update(update):
             start_work(chat_id)
         elif data == "work_cancel":
             clear_session(chat_id)
-            send_message("❌ **প্রক্রিয়া বাতিল করা হয়েছে।**", chat_id, reply_markup=main_keyboard(chat_id))
+            send_message("❌ প্রক্রিয়া বাতিল করা হয়েছে।", chat_id, reply_markup=main_keyboard(chat_id))
+        elif data == "twofa_prompt":
+            prompt_twofa(chat_id)
         elif data == "follow_yes":
             process_follow_yes(chat_id)
         elif data == "follow_no":
@@ -1127,7 +1197,7 @@ def process_update(update):
             withdraw_request(chat_id, "nagad")
         elif data == "withdraw_cancel":
             clear_session(chat_id)
-            send_message("❌ **উইথড্র বাতিল করা হয়েছে।**", chat_id, reply_markup=main_keyboard(chat_id))
+            send_message("❌ উইথড্র বাতিল করা হয়েছে।", chat_id, reply_markup=main_keyboard(chat_id))
         elif data.startswith("credpage_"):
             page = int(data.split("_")[1])
             admin_list_creds(chat_id, page=page, message_id=message_id)
@@ -1148,10 +1218,8 @@ if __name__ == "__main__":
     load_all()
     logger.info(f"লোড হয়েছে: {len(subscribed_users)} ইউজার, {len(credentials)} ক্রেডেনশিয়াল")
 
-    # অটো রিস্টোর
     auto_restore_from_channel()
 
-    # ব্যাকগ্রাউন্ড থ্রেড
     threading.Thread(target=auto_backup_loop, daemon=True).start()
     threading.Thread(target=handle_updates, daemon=True).start()
 
