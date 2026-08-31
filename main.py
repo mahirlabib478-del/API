@@ -38,7 +38,7 @@ config = {
     "channel_id": "",
     "work_rules": "📱 **Instagram অ্যাকাউন্ট খোলার নিয়মাবলী**\n\n"
                   "1️⃣ বট আপনাকে একটি ইমেইল ও পাসওয়ার্ড প্রদান করবে।\n"
-                  "2️⃣ 2FA কোড দিন (না থাকলে 0 লিখুন)।\n"
+                  "2️⃣ 2FA কোড দিন (যদি থাকে)।\n"
                   "3️⃣ ৫টি প্রোফাইল ফলো করুন।\n"
                   "4️⃣ সফলভাবে সম্পন্ন হলে ব্যালেন্স যোগ হবে।"
 }
@@ -164,21 +164,7 @@ def edit_message_text(chat_id, message_id, text, reply_markup=None):
         logger.error(f"এডিট error: {e}")
         return None
 
-# ================== ইনস্টাগ্রাম অ্যাকাউন্ট ক্রিয়েট (সিমুলেটেড) ==================
-def create_instagram_account(email, password):
-    try:
-        time.sleep(2)
-        return {
-            "success": True,
-            "message": f"অ্যাকাউন্ট তৈরি সফল! ইমেইল: {email}"
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"অ্যাকাউন্ট তৈরি ব্যর্থ: {str(e)}"
-        }
-
-# ================== ব্যালেন্স ও প্রোফাইল ==================
+# ================== ব্যালেন্স ও ইউজার ==================
 def add_balance(user_id, amount):
     with data_lock:
         uid = str(user_id)
@@ -196,23 +182,20 @@ def deduct_balance(user_id, amount):
             return True
         return False
 
-def get_profile_text(user_id):
+def get_balance_text(user_id):
     uid = str(user_id)
-    name = user_info.get(uid, {}).get("name", f"User_{user_id}")
     balance = user_balances.get(uid, 0.0)
     total_accounts = user_info.get(uid, {}).get("total_accounts", 0)
     return (
-        f"👤 **ব্যবহারকারী প্রোফাইল**\n\n"
-        f"📛 **নাম:** {name}\n"
-        f"🆔 **আইডি:** `{user_id}`\n"
-        f"💰 **ব্যালেন্স:** `{balance:.2f}` টাকা\n"
-        f"📦 **মোট অ্যাকাউন্ট খোলা:** {total_accounts} টি\n"
+        f"💰 **আপনার ব্যালেন্স**\n\n"
+        f"ব্যালেন্স: `{balance:.2f}` টাকা\n"
+        f"মোট অ্যাকাউন্ট খোলা: {total_accounts} টি"
     )
 
 # ================== কিবোর্ড ==================
 def main_keyboard(chat_id):
     kb = [
-        ["📱 Instagram Work", "👤 প্রোফাইল"],
+        ["📱 Instagram Work", "💰 ব্যালেন্স"],
         ["💸 উইথড্র"]
     ]
     if str(chat_id) == ADMIN_CHAT_ID:
@@ -829,23 +812,13 @@ def start_work(chat_id):
         "twofa": None
     })
     
-    result = create_instagram_account(cred["email"], cred["password"])
-    
-    if result["success"]:
-        send_message(
-            f"✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n"
-            f"📧 **ইমেইল:** `{cred['email']}`\n"
-            f"🔑 **পাসওয়ার্ড:** `{cred['password']}`\n\n"
-            f"🔄 অ্যাকাউন্ট তৈরি হচ্ছে...\n\n"
-            f"🔐 **2FA দিন** বাটনে ক্লিক করে 2FA কোড দিন (0 skip):",
-            chat_id, reply_markup=twofa_button_keyboard()
-        )
-    else:
-        send_message(
-            f"❌ অ্যাকাউন্ট তৈরি ব্যর্থ!\n{result['message']}\n\n"
-            f"আবার চেষ্টা করতে **Start** বাটনে ক্লিক করুন।",
-            chat_id, reply_markup=work_start_keyboard()
-        )
+    send_message(
+        f"✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n"
+        f"📧 **ইমেইল:** `{cred['email']}`\n"
+        f"🔑 **পাসওয়ার্ড:** `{cred['password']}`\n\n"
+        f"🔐 **2FA দিন** বাটনে ক্লিক করে 2FA কোড দিন:",
+        chat_id, reply_markup=twofa_button_keyboard()
+    )
 
 def prompt_twofa(chat_id):
     session = get_session(chat_id)
@@ -856,7 +829,7 @@ def prompt_twofa(chat_id):
     set_session(chat_id, session)
     
     send_message(
-        "🔐 **2FA কোড দিন (0 skip):**",
+        "🔐 **2FA কোড দিন:**",
         chat_id, reply_markup=cancel_keyboard()
     )
 
@@ -867,11 +840,6 @@ def process_twofa(chat_id, text):
     
     twofa_code = text.strip()
     session["twofa"] = twofa_code
-    
-    if twofa_code == "0":
-        pass
-    else:
-        time.sleep(1)
     
     session["step"] = "follow"
     set_session(chat_id, session)
@@ -912,6 +880,10 @@ def process_follow_no(chat_id):
         "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
         chat_id, reply_markup=yes_no_keyboard()
     )
+
+def show_balance(chat_id):
+    text = get_balance_text(chat_id)
+    send_message(text, chat_id)
 
 def withdraw_start(chat_id):
     clear_session(chat_id)
@@ -1109,9 +1081,8 @@ def process_update(update):
         if text == "📱 Instagram Work":
             instagram_work(chat_id)
             return
-        if text == "👤 প্রোফাইল":
-            profile_text = get_profile_text(chat_id)
-            send_message(profile_text, chat_id)
+        if text == "💰 ব্যালেন্স":
+            show_balance(chat_id)
             return
         if text == "💸 উইথড্র":
             withdraw_start(chat_id)
