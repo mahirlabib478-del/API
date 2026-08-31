@@ -92,7 +92,6 @@ def load_all():
     credentials = load_json(CREDENTIALS_FILE, [])
     withdraw_requests = load_json(WITHDRAWS_FILE, [])
     created_accounts = load_json(CREATED_ACCOUNTS_FILE, [])
-    # Ensure created_accounts is a list
     if not isinstance(created_accounts, list):
         created_accounts = []
     user_balances = load_json(USER_BALANCES_FILE, {})
@@ -351,7 +350,7 @@ def admin_keyboard():
             ["💲 Set Price", "📝 Edit Rules"],
             ["📥 Withdraw Requests", "📁 Backup"],
             ["📥 Restore", f"🔧 Maintenance {maint_status}"],
-            ["📁 Created Accounts", "📥 Export Excel"],
+            ["📥 Export Excel"],   # 👈 Created Accounts button removed, only Export Excel remains
             ["🔙 Main Menu"]
         ],
         "resize_keyboard": True
@@ -1010,65 +1009,6 @@ def process_restore_file(chat_id, file_content):
         send_message("❌ Restore failed. Invalid file format.", chat_id, reply_markup=admin_keyboard())
     clear_session(chat_id)
 
-# ================== FIXED: CREATED ACCOUNTS LIST ==================
-def admin_list_created_accounts(chat_id, page=0, message_id=None):
-    try:
-        # Ensure created_accounts is a list
-        if not isinstance(created_accounts, list):
-            logger.error(f"created_accounts is not a list: {type(created_accounts)}")
-            created_accounts.clear()
-            save_json(CREATED_ACCOUNTS_FILE, created_accounts)
-
-        total = len(created_accounts)
-        logger.info(f"admin_list_created_accounts called, total: {total}")
-        if total == 0:
-            msg = t("created_accounts_empty", chat_id)
-            send_message(msg, chat_id, reply_markup=admin_keyboard())
-            return
-
-        per_page = 10
-        total_pages = (total + per_page - 1) // per_page
-        page = max(0, min(page, total_pages - 1))
-        start = page * per_page
-        end = min(start + per_page, total)
-        page_items = created_accounts[start:end]
-        lang = get_lang(chat_id)
-        lines = [t("created_accounts_list", chat_id, page=page+1, total_pages=total_pages)]
-        for acc in page_items:
-            # Safety: ensure each item has the required keys
-            username = acc.get("username", "N/A")
-            email = acc.get("email", "N/A")
-            password = acc.get("password", "N/A")
-            twofa = acc.get("twofa", "N/A")
-            user_id = acc.get("user_id", "N/A")
-            time_str = datetime.fromtimestamp(acc.get("timestamp", time.time())).strftime("%d/%m %H:%M")
-            lines.append(t("created_account_item", chat_id,
-                           username=username,
-                           email=email,
-                           password=password,
-                           twofa=twofa,
-                           user_id=user_id,
-                           time=time_str))
-        text = "\n".join(lines)
-        kb = {"inline_keyboard": []}
-        nav = []
-        if page > 0:
-            nav.append({"text": "⬅️ Previous" if lang == "en" else "⬅️ আগের", "callback_data": f"capage_{page-1}"})
-        if page < total_pages - 1:
-            nav.append({"text": "Next ➡️" if lang == "en" else "পরের ➡️", "callback_data": f"capage_{page+1}"})
-        if nav:
-            kb["inline_keyboard"].append(nav)
-        kb["inline_keyboard"].append([{"text": "🔙 Close" if lang == "en" else "🔙 বন্ধ", "callback_data": "close_calist"}])
-        if message_id:
-            edit_message_text(chat_id, message_id, text, reply_markup=kb)
-        else:
-            send_message(text, chat_id, reply_markup=kb)
-    except Exception as e:
-        logger.error(f"Error in admin_list_created_accounts: {e}")
-        import traceback
-        traceback.print_exc()
-        send_message("❌ An error occurred while fetching created accounts. Please check logs.", chat_id, reply_markup=admin_keyboard())
-
 def admin_export_excel(chat_id):
     if not created_accounts:
         send_message("📭 No accounts to export.", chat_id, reply_markup=admin_keyboard())
@@ -1369,10 +1309,7 @@ def process_update(update):
             if text.startswith("🔧 Maintenance"):
                 admin_toggle_maintenance(chat_id)
                 return
-            if text == "📁 Created Accounts":
-                admin_list_created_accounts(chat_id)
-                return
-            if text == "📥 Export Excel":
+            if text == "📥 Export Excel":   # 👈 Keep Export Excel handler
                 admin_export_excel(chat_id)
                 return
             if text == "🔙 Main Menu":
@@ -1496,8 +1433,10 @@ def process_update(update):
             msg = "📋 Withdraw list closed." if lang == "en" else "📋 উইথড্র তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
         elif data.startswith("capage_"):
+            # Keep handler for any remaining callback, but the button is removed; still safe
             page = int(data.split("_")[1])
-            admin_list_created_accounts(chat_id, page=page, message_id=message_id)
+            # Optionally handle if needed; but we can ignore
+            pass
         elif data == "close_calist":
             delete_message(chat_id, message_id)
             lang = get_lang(chat_id)
