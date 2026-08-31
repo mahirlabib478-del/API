@@ -3,10 +3,10 @@ import time
 import json
 import threading
 import logging
-import uuid
 import requests
 from flask import Flask
 from datetime import datetime
+
 
 # ================== কনফিগারেশন ==================
 BOT_TOKEN = "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI"
@@ -24,7 +24,7 @@ PENDING_FILE = "pending_cookies.json"
 CONFIG_FILE = "config.json"
 
 # ================== গ্লোবাল ভেরিয়েবল ==================
-pending_cookies = []  # এখন আর কেউ যোগ করবে না, তবে রাখলাম
+pending_cookies = []          # পেন্ডিং দেখানোর জন্য রাখলাম (কিন্তু কেউ যোগ করতে পারবে না)
 subscribed_users = set()
 api_status = {
     "online": False,
@@ -116,7 +116,7 @@ def answer_callback(cb_id, text=None):
     except:
         pass
 
-# ================== কিবোর্ড (আপডেটেড) ==================
+# ================== কিবোর্ড ==================
 def get_main_keyboard(chat_id):
     kb = [
         ["📊 API স্ট্যাটাস", "⏳ পেন্ডিং দেখুন"]
@@ -128,7 +128,7 @@ def get_main_keyboard(chat_id):
 def admin_keyboard():
     return {
         "keyboard": [
-            ["📊 সার্বিক পরিসংখ্যান", "🗑️ পেন্ডিং ক্লিয়ার"],
+            ["📊 সার্বিক পরিসংখ্যান"],
             ["🔧 মেইন্টেনেন্স টগল", "🔙 মূল মেনু"]
         ],
         "resize_keyboard": True
@@ -170,18 +170,7 @@ def fetch_api_status():
         api_status["online"] = False
         return api_status
 
-def check_api_status():
-    status = fetch_api_status()
-    return status["online"]
-
-# ================== পেন্ডিং ক্লিয়ার (শুধু অ্যাডমিনের জন্য) ==================
-def clear_pending(chat_id):
-    with data_lock:
-        pending_cookies.clear()
-        save_all()
-    send_telegram_message("🗑️ সব পেন্ডিং কুকি ক্লিয়ার করা হয়েছে (যদি থেকে থাকে)।", chat_id)
-
-# ================== ব্যাকগ্রাউন্ড মনিটর থ্রেড ==================
+# ================== মনিটর থ্রেড ==================
 previous_online_status = None
 
 def api_monitor_loop():
@@ -204,7 +193,7 @@ def api_monitor_loop():
             logger.error(f"মনিটর লুপ error: {e}")
             time.sleep(60)
 
-# ================== স্ট্যাটাস মেসেজ ==================
+# ================== স্ট্যাটাস টেক্সট ==================
 def get_status_text():
     s = api_status
     status_emoji = "🟢" if s["online"] else "🔴"
@@ -283,7 +272,7 @@ def toggle_maintenance(chat_id):
     status = "চালু" if config["maintenance"] else "বন্ধ"
     send_telegram_message(f"🔧 মেইন্টেনেন্স মোড {status} করা হয়েছে।", chat_id)
 
-# ================== মেসেজ হ্যান্ডলার (আপডেটেড) ==================
+# ================== মেসেজ হ্যান্ডলার ==================
 last_update_id = 0
 
 def handle_updates():
@@ -344,10 +333,6 @@ def process_update(update):
             admin_stats(chat_id)
             return
 
-        if text == "🗑️ পেন্ডিং ক্লিয়ার" and chat_id == ADMIN_CHAT_ID:
-            clear_pending(chat_id)
-            return
-
         if text == "🔧 মেইন্টেনেন্স টগল" and chat_id == ADMIN_CHAT_ID:
             toggle_maintenance(chat_id)
             return
@@ -360,10 +345,7 @@ def process_update(update):
             send_telegram_message("❌ বাতিল করা হয়েছে।", chat_id, reply_markup=get_main_keyboard(chat_id))
             return
 
-        # ===== ডকুমেন্ট / ফাইল হ্যান্ডলিং বাদ =====
-        # ===== কুকি হিসেবে টেক্সট গ্রহণ বাদ =====
-        
-        # অচেনা টেক্সট
+        # ===== অচেনা টেক্সট =====
         if text:
             send_telegram_message(
                 "❌ এই বট শুধু স্ট্যাটাস দেখানোর জন্য। কুকি সাবমিট করার অপশন বন্ধ করা হয়েছে।",
@@ -379,7 +361,7 @@ def process_update(update):
 # ================== ফ্লাস্ক ==================
 @app.route("/")
 def home():
-    return "Cookie Monitor Bot is Running!"
+    return "API Monitor Bot is Running!"
 
 # ================== মেইন ==================
 if __name__ == "__main__":
