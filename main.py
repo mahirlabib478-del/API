@@ -45,7 +45,7 @@ config = {
 user_balances = {}
 user_info = {}
 
-admin_cred_upload_session = {}
+admin_cred_upload_session = {}  # { chat_id: {"step": "email"|"password", "emails": [...]} }
 admin_cred_list_page = {}
 last_backup_message_id = None
 last_backup_part_ids = []
@@ -95,7 +95,6 @@ def save_all():
     save_json(CONFIG_FILE, config)
     save_json(USER_BALANCES_FILE, user_balances)
     save_json(USER_INFO_FILE, user_info)
-    # অটো ব্যাকআপ ট্রিগার (ডেবাউন্স সহ)
     trigger_backup()
 
 # ================== ডেবাউন্সড ব্যাকআপ ==================
@@ -530,35 +529,73 @@ def auto_restore_from_channel():
 def admin_panel(chat_id):
     send_message("⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**", chat_id, reply_markup=admin_keyboard())
 
+# ===== অ্যাকাউন্ট যোগ (ইমেইল → পাসওয়ার্ড) =====
 def admin_add_creds_prompt(chat_id):
-    admin_cred_upload_session[chat_id] = {"step": "upload"}
+    admin_cred_upload_session[chat_id] = {"step": "email"}
     send_message(
-        "➕ **অ্যাকাউন্ট ক্রেডেনশিয়াল যোগ করুন**\n\n"
-        "প্রতি লাইনে একটি `email:password` ফরম্যাটে লিখুন:\n\n"
+        "📧 **ইমেইল লিস্ট দিন**\n\n"
+        "প্রতি লাইনে একটি ইমেইল লিখুন:\n\n"
         "উদাহরণ:\n"
-        "`user1@gmail.com:pass123`\n"
-        "`user2@yahoo.com:pass456`\n\n"
+        "`user1@gmail.com`\n"
+        "`user2@yahoo.com`\n"
+        "`user3@outlook.com`\n\n"
         "বাতিল করতে `/cancel` লিখুন।",
         chat_id,
         reply_markup={"inline_keyboard": [[{"text": "❌ বাতিল", "callback_data": "admin_cancel"}]]}
     )
 
-def process_admin_creds(chat_id, text):
-    if chat_id not in admin_cred_upload_session:
+def process_admin_creds_email(chat_id, text):
+    if chat_id not in admin_cred_upload_session or admin_cred_upload_session[chat_id].get("step") != "email":
         return False
-    lines = text.strip().splitlines()
+    
+    emails = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    # সাধারণ ভ্যালিডেশন: @ আছে কিনা
+    valid_emails = [e for e in emails if '@' in e]
+    
+    if not valid_emails:
+        send_message("❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**\nআবার চেষ্টা করুন।", chat_id)
+        return True
+    
+    invalid_count = len(emails) - len(valid_emails)
+    admin_cred_upload_session[chat_id]["emails"] = valid_emails
+    admin_cred_upload_session[chat_id]["step"] = "password"
+    
+    msg = f"✅ **{len(valid_emails)}** টি ইমেইল গ্রহণ করা হয়েছে।"
+    if invalid_count > 0:
+        msg += f"\n⚠️ {invalid_count} টি ইনভ্যালিড ইমেইল বাদ পড়েছে।"
+    
+    msg += "\n\n🔑 **এখন পাসওয়ার্ড দিন** (সব অ্যাকাউন্টের জন্য একটি পাসওয়ার্ড):"
+    send_message(msg, chat_id)
+    return True
+
+def process_admin_creds_password(chat_id, text):
+    if chat_id not in admin_cred_upload_session or admin_cred_upload_session[chat_id].get("step") != "password":
+        return False
+    
+    password = text.strip()
+    if not password:
+        send_message("❌ **পাসওয়ার্ড খালি রাখা যাবে না।**\nআবার দিন।", chat_id)
+        return True
+    
+    emails = admin_cred_upload_session[chat_id]["emails"]
     added = 0
-    for line in lines:
-        if ":" in line:
-            parts = line.split(":", 1)
-            email, password = parts[0].strip(), parts[1].strip()
-            if email and password:
-                with data_lock:
-                    credentials.append({"email": email, "password": password, "used": False, "assigned_to": None})
-                    added += 1
-    save_all()
-    send_message(f"✅ **{added}** টি অ্যাকাউন্ট যোগ করা হয়েছে।\n📦 মোট: **{len(credentials)}** টি", chat_id, reply_markup=admin_keyboard())
+    with data_lock:
+        for email in emails:
+            credentials.append({
+                "email": email,
+                "password": password,
+                "used": False,
+                "assigned_to": None
+            })
+            added += 1
+        save_all()
+    
     del admin_cred_upload_session[chat_id]
+    send_message(
+        f"✅ **{added}** টি অ্যাকাউন্ট যোগ করা হয়েছে।\n"
+        f"📦 **মোট:** {len(credentials)} টি ক্রেডেনশিয়াল",
+        chat_id, reply_markup=admin_keyboard()
+    )
     return True
 
 def admin_list_creds(chat_id, page=0, message_id=None):
@@ -798,7 +835,6 @@ def process_2fa(chat_id, text):
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "2fa":
         return False
-    # 2FA সিমুলেট
     if text.strip() == "0":
         pass
     else:
@@ -949,12 +985,18 @@ def process_update(update):
 
         # ===== অ্যাডমিন =====
         if chat_id == ADMIN_CHAT_ID:
+            # অ্যাকাউন্ট যোগ সেশন হ্যান্ডলিং (ইমেইল -> পাসওয়ার্ড)
             if chat_id in admin_cred_upload_session:
                 if text == "/cancel":
                     del admin_cred_upload_session[chat_id]
                     send_message("❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
                     return
-                process_admin_creds(chat_id, text)
+                
+                step = admin_cred_upload_session[chat_id].get("step")
+                if step == "email":
+                    process_admin_creds_email(chat_id, text)
+                elif step == "password":
+                    process_admin_creds_password(chat_id, text)
                 return
 
             if text == "⚙️ অ্যাডমিন প্যানেল":
