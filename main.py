@@ -164,18 +164,10 @@ def edit_message_text(chat_id, message_id, text, reply_markup=None):
         logger.error(f"এডিট error: {e}")
         return None
 
-# ================== ইন্সটাগ্রাম অ্যাকাউন্ট ক্রিয়েট (সিমুলেটেড) ==================
+# ================== ইনস্টাগ্রাম অ্যাকাউন্ট ক্রিয়েট (সিমুলেটেড) ==================
 def create_instagram_account(email, password):
-    """
-    ইন্সটাগ্রাম অ্যাকাউন্ট তৈরির সিমুলেশন
-    আসলে এটি ব্রাউজারের মাধ্যমে ইন্সটাগ্রামে লগইন করে অ্যাকাউন্ট তৈরি করবে
-    """
     try:
-        # এটি একটি সিমুলেশন - আসলে ইন্সটাগ্রামে অ্যাকাউন্ট তৈরি করা জটিল
-        # আপনি চাইলে এখানে Selenium বা Playwright ব্যবহার করতে পারেন
-        time.sleep(3)  # নেটওয়ার্ক ডেলি
-        
-        # সিমুলেটেড সফলতা
+        time.sleep(2)
         return {
             "success": True,
             "message": f"অ্যাকাউন্ট তৈরি সফল! ইমেইল: {email}"
@@ -232,11 +224,10 @@ def admin_keyboard():
         "keyboard": [
             ["➕ অ্যাকাউন্ট যোগ", "📋 অ্যাকাউন্ট লিস্ট"],
             ["🗑️ অ্যাকাউন্ট ডিলিট", "📊 পরিসংখ্যান"],
-            ["💰 ব্যালেন্স সেট", "💲 মূল্য সেট"],
-            ["💳 বিকাশ নম্বর সেট", "💳 নগদ নম্বর সেট"],
-            ["📝 নিয়ম পরিবর্তন", "📥 উইথড্র রিকোয়েস্ট"],
-            ["📁 ব্যাকআপ", "📥 রিস্টোর"],
-            ["🔙 মূল মেনু"]
+            ["💲 মূল্য সেট", "💳 বিকাশ নম্বর সেট"],
+            ["💳 নগদ নম্বর সেট", "📝 নিয়ম পরিবর্তন"],
+            ["📥 উইথড্র রিকোয়েস্ট", "📁 ব্যাকআপ"],
+            ["📥 রিস্টোর", "🔙 মূল মেনু"]
         ],
         "resize_keyboard": True
     }
@@ -727,20 +718,6 @@ def admin_reject_withdraw(chat_id, w_id):
                 return
     send_message(f"❌ {w_id} পাওয়া যায়নি।", chat_id)
 
-def admin_set_balance(chat_id, text):
-    parts = text.split()
-    if len(parts) != 3:
-        send_message("❌ **ফরম্যাট:** `/setbalance <user_id> <amount>`", chat_id)
-        return
-    try:
-        user_id, amount = parts[1], float(parts[2])
-        user_balances[user_id] = amount
-        save_json(USER_BALANCES_FILE, user_balances)
-        trigger_backup()
-        send_message(f"✅ ইউজার `{user_id}` এর ব্যালেন্স **{amount}** টাকা সেট করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
-    except:
-        send_message("❌ ভুল ফরম্যাট।", chat_id)
-
 def admin_set_price(chat_id, text):
     parts = text.split()
     if len(parts) != 2:
@@ -823,7 +800,7 @@ def start_command(chat_id, chat_type="private"):
     else:
         send_message(
             "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\n"
-            "আমাকে প্রাইভেট চ্যাটে `/start` দিন অথবা @username দিয়ে সার্চ করুন।",
+            "আমাকে প্রাইভেট চ্যাটে `/start` দিন।",
             chat_id
         )
 
@@ -852,7 +829,6 @@ def start_work(chat_id):
         "twofa": None
     })
     
-    # অ্যাকাউন্ট তৈরি করার চেষ্টা
     result = create_instagram_account(cred["email"], cred["password"])
     
     if result["success"]:
@@ -861,7 +837,7 @@ def start_work(chat_id):
             f"📧 **ইমেইল:** `{cred['email']}`\n"
             f"🔑 **পাসওয়ার্ড:** `{cred['password']}`\n\n"
             f"🔄 অ্যাকাউন্ট তৈরি হচ্ছে...\n\n"
-            f"🔐 **2FA দিন** বাটনে ক্লিক করে 2FA কোড দিন (যদি থাকে):",
+            f"🔐 **2FA দিন** বাটনে ক্লিক করে 2FA কোড দিন (0 skip):",
             chat_id, reply_markup=twofa_button_keyboard()
         )
     else:
@@ -876,14 +852,11 @@ def prompt_twofa(chat_id):
     if not session or not session.get("active"):
         return
     
-    # 2FA ইনপুট নেওয়ার জন্য স্টেপ পরিবর্তন
     session["step"] = "twofa_input"
     set_session(chat_id, session)
     
     send_message(
-        "🔐 **2FA কোড দিন:**\n\n"
-        "আপনার ইমেইলে আসা 6-ডিজিটের কোডটি লিখুন।\n"
-        "যদি 2FA না থাকে তাহলে `0` লিখুন।",
+        "🔐 **2FA কোড দিন (0 skip):**",
         chat_id, reply_markup=cancel_keyboard()
     )
 
@@ -895,7 +868,6 @@ def process_twofa(chat_id, text):
     twofa_code = text.strip()
     session["twofa"] = twofa_code
     
-    # 2FA ভেরিফাই (সিমুলেট)
     if twofa_code == "0":
         pass
     else:
@@ -1091,9 +1063,6 @@ def process_update(update):
             if text == "📥 রিস্টোর":
                 admin_restore(chat_id)
                 return
-            if text == "💰 ব্যালেন্স সেট":
-                send_message("/setbalance <user_id> <amount>", chat_id, reply_markup=admin_keyboard())
-                return
             if text == "💲 মূল্য সেট":
                 send_message("/setprice <amount>", chat_id, reply_markup=admin_keyboard())
                 return
@@ -1110,9 +1079,6 @@ def process_update(update):
                 send_message("🔙 মূল মেনুতে ফিরে যান।", chat_id, reply_markup=main_keyboard(chat_id))
                 return
 
-            if text.startswith("/setbalance"):
-                admin_set_balance(chat_id, text)
-                return
             if text.startswith("/setprice"):
                 admin_set_price(chat_id, text)
                 return
@@ -1144,7 +1110,8 @@ def process_update(update):
             instagram_work(chat_id)
             return
         if text == "👤 প্রোফাইল":
-            send_message(get_profile_text(chat_id), chat_id)
+            profile_text = get_profile_text(chat_id)
+            send_message(profile_text, chat_id)
             return
         if text == "💸 উইথড্র":
             withdraw_start(chat_id)
@@ -1163,6 +1130,7 @@ def process_update(update):
                 process_twofa(chat_id, text)
                 return
 
+        # প্রাইভেটে অচেনা টেক্সট
         send_message(
             "❌ আমি বুঝতে পারিনি।\n"
             "দয়া করে /start দিন অথবা নিচের বাটন ব্যবহার করুন।",
