@@ -53,7 +53,7 @@ config = {
                      "2️⃣ আপনার Instagram ইউজারনেম দিন।\n"
                      "3️⃣ 2FA কোড দিন (যদি থাকে)।\n"
                      "4️⃣ ৫টি প্রোফাইল ফলো করুন ও প্রোফাইল পিক সেট করুন।\n"
-                     "5️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে।"
+                     "5️⃣ সম্পন্ন হলে আপনার ব্যালেন্স যোগ হবে。"
 }
 user_balances = {}
 user_info = {}
@@ -267,7 +267,7 @@ def t(key, user_id, **kwargs):
             "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
             "cancelled": "❌ বাতিল করা হয়েছে।",
             "unknown": "❌ আমি বুঝতে পারিনি। দয়া করে নিচের বাটন ব্যবহার করুন।",
-            "work": "📱 **Instagram Work**\n\n{rules}\n\n👇 **Start** বাটনে ক্লিক করুন।",
+            "work": "📱 **Instagram Work**\n\n{rules}\n\n👇 **Start** বাটনে ক্লিক করুন。",
             "language_changed": "🌐 ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
             "admin_panel": "⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**",
             "add_accounts": "📧 **ইমেইল লিস্ট দিন**\n\nপ্রতি লাইনে একটি:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nবাতিল করতে /cancel লিখুন।",
@@ -1095,9 +1095,11 @@ def start_work(chat_id):
         send_message(t("no_accounts", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
         return
     assign_credential_to_user(cred, chat_id)
+    
+    # 🔥 FIX: set step to "username_input" so that the user's username input is processed
     set_session(chat_id, {
         "active": True,
-        "step": "username",  # first ask username
+        "step": "username_input",   # changed from "username"
         "email": cred["email"],
         "password": cred["password"],
         "username": None,
@@ -1105,14 +1107,6 @@ def start_work(chat_id):
     })
     send_message(t("account_assigned", chat_id, email=cred["email"], password=cred["password"]),
                  chat_id, reply_markup=cancel_keyboard(chat_id))
-
-def prompt_username(chat_id):
-    session = get_session(chat_id)
-    if not session or not session.get("active"):
-        return
-    session["step"] = "username_input"
-    set_session(chat_id, session)
-    send_message(t("enter_username", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
 
 def process_username(chat_id, text):
     session = get_session(chat_id)
@@ -1123,16 +1117,10 @@ def process_username(chat_id, text):
         send_message("❌ Username cannot be empty. Please enter again:", chat_id)
         return True
     session["username"] = username
-    session["step"] = "twofa"  # next ask 2FA
+    session["step"] = "twofa"
     set_session(chat_id, session)
     send_message(t("twofa_prompt", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
     return True
-
-def prompt_twofa(chat_id):
-    # This function is called when user presses "2FA" button (if any) but we handle via step
-    # Actually we will not use this if we directly ask after username.
-    # We'll keep it for compatibility but flow is: username -> twofa
-    pass
 
 def process_twofa(chat_id, text):
     session = get_session(chat_id)
