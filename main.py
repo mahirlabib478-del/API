@@ -9,15 +9,15 @@ import requests
 from flask import Flask
 from datetime import datetime
 
-# ================== কনফিগারেশন ==================
+# ================== CONFIGURATION ==================
 BOT_TOKEN = "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI"
 ADMIN_CHAT_ID = "8538304896"
 
-# ================== লগিং ==================
+# ================== LOGGING ==================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# ================== ফাইল পাথ ==================
+# ================== FILE PATHS ==================
 USERS_FILE = "users.json"
 SESSIONS_FILE = "sessions.json"
 CREDENTIALS_FILE = "credentials.json"
@@ -26,27 +26,24 @@ CONFIG_FILE = "config.json"
 USER_BALANCES_FILE = "user_balances.json"
 USER_INFO_FILE = "user_info.json"
 
-# ================== গ্লোবাল ==================
+# ================== GLOBALS ==================
 subscribed_users = set()
 user_sessions = {}
 credentials = []
 withdraw_requests = []
 config = {
-    "bkash_number": "01XXXXXXXXX",
-    "nagad_number": "01XXXXXXXXX",
     "base_balance": 10.0,
     "channel_id": "",
-    "work_rules": "📱 **Instagram অ্যাকাউন্ট খোলার নিয়মাবলী**\n\n"
-                  "1️⃣ বট আপনাকে একটি ইমেইল ও পাসওয়ার্ড প্রদান করবে।\n"
-                  "2️⃣ 2FA কোড দিন (যদি থাকে)।\n"
-                  "3️⃣ ৫টি প্রোফাইল ফলো করুন।\n"
-                  "4️⃣ সফলভাবে সম্পন্ন হলে ব্যালেন্স যোগ হবে।"
+    "work_rules": "📱 **Instagram Account Opening Guidelines**\n\n"
+                  "1️⃣ You will receive an email and password.\n"
+                  "2️⃣ Enter 2FA code if required.\n"
+                  "3️⃣ Follow 5 profiles.\n"
+                  "4️⃣ Upon completion, your balance will be credited."
 }
 user_balances = {}
 user_info = {}
 
 admin_cred_upload_session = {}
-admin_cred_list_page = {}
 last_backup_message_id = None
 last_backup_part_ids = []
 save_pending = False
@@ -56,7 +53,7 @@ data_lock = threading.RLock()
 backup_lock = threading.Lock()
 app = Flask(__name__)
 
-# ================== ফাইল I/O ==================
+# ================== FILE I/O ==================
 def load_json(filename, default):
     try:
         with open(filename, "r") as f:
@@ -70,7 +67,7 @@ def save_json(filename, data):
             with open(filename, "w") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"সেভ ব্যর্থ {filename}: {e}")
+            logger.error(f"Save failed {filename}: {e}")
 
 def load_all():
     global subscribed_users, user_sessions, credentials, withdraw_requests, config, user_balances, user_info
@@ -97,7 +94,7 @@ def save_all():
     save_json(USER_INFO_FILE, user_info)
     trigger_backup()
 
-# ================== ডেবাউন্সড ব্যাকআপ ==================
+# ================== DEBOUNCED BACKUP ==================
 def trigger_backup():
     global save_pending, save_timer
     with data_lock:
@@ -115,7 +112,7 @@ def execute_backup():
         save_pending = False
     save_data_to_channel()
 
-# ================== টেলিগ্রাম হেল্পার ==================
+# ================== TELEGRAM HELPERS ==================
 def send_message(text, chat_id, reply_markup=None, parse_mode="Markdown"):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
@@ -124,7 +121,7 @@ def send_message(text, chat_id, reply_markup=None, parse_mode="Markdown"):
     try:
         return requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        logger.error(f"সেন্ড error: {e}")
+        logger.error(f"Send error: {e}")
         return None
 
 def send_document(file_bytes, filename, chat_id, caption=""):
@@ -133,7 +130,7 @@ def send_document(file_bytes, filename, chat_id, caption=""):
         files = {'document': (filename, file_bytes, 'application/gzip')}
         return requests.post(url, data={"chat_id": chat_id, "caption": caption}, files=files, timeout=60)
     except Exception as e:
-        logger.error(f"ডকুমেন্ট error: {e}")
+        logger.error(f"Document error: {e}")
         return None
 
 def delete_message(chat_id, message_id):
@@ -153,18 +150,7 @@ def answer_callback(cb_id, text=None):
     except:
         pass
 
-def edit_message_text(chat_id, message_id, text, reply_markup=None):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
-    payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"}
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
-    try:
-        return requests.post(url, json=payload, timeout=10)
-    except Exception as e:
-        logger.error(f"এডিট error: {e}")
-        return None
-
-# ================== ব্যালেন্স ও ইউজার ==================
+# ================== BALANCE & USER FUNCTIONS ==================
 def add_balance(user_id, amount):
     with data_lock:
         uid = str(user_id)
@@ -187,83 +173,78 @@ def get_balance_text(user_id):
     balance = user_balances.get(uid, 0.0)
     total_accounts = user_info.get(uid, {}).get("total_accounts", 0)
     return (
-        f"💰 **আপনার ব্যালেন্স**\n\n"
-        f"ব্যালেন্স: `{balance:.2f}` টাকা\n"
-        f"মোট অ্যাকাউন্ট খোলা: {total_accounts} টি"
+        f"💰 **Your Balance**\n\n"
+        f"Balance: `{balance:.2f}` BDT\n"
+        f"Total Accounts Opened: {total_accounts}"
     )
 
-# ================== কিবোর্ড ==================
+# ================== KEYBOARDS ==================
 def main_keyboard(chat_id):
     kb = [
-        ["📱 Instagram Work", "💰 ব্যালেন্স"],
-        ["💸 উইথড্র"]
+        ["📱 Instagram Work", "💰 Balance"],
+        ["💸 Withdraw"]
     ]
     if str(chat_id) == ADMIN_CHAT_ID:
-        kb.append(["⚙️ অ্যাডমিন প্যানেল"])
+        kb.append(["⚙️ Admin Panel"])
     return {"keyboard": kb, "resize_keyboard": True}
 
 def admin_keyboard():
     return {
         "keyboard": [
-            ["➕ অ্যাকাউন্ট যোগ", "📋 অ্যাকাউন্ট লিস্ট"],
-            ["🗑️ অ্যাকাউন্ট ডিলিট", "📊 পরিসংখ্যান"],
-            ["💲 মূল্য সেট", "💳 বিকাশ নম্বর সেট"],
-            ["💳 নগদ নম্বর সেট", "📝 নিয়ম পরিবর্তন"],
-            ["📥 উইথড্র রিকোয়েস্ট", "📁 ব্যাকআপ"],
-            ["📥 রিস্টোর", "🔙 মূল মেনু"]
+            ["➕ Add Accounts", "📋 Account List"],
+            ["🗑️ Delete All", "📊 Statistics"],
+            ["💲 Set Price", "📝 Edit Rules"],
+            ["📥 Withdraw Requests", "📁 Backup"],
+            ["📥 Restore", "🔙 Main Menu"]
         ],
         "resize_keyboard": True
     }
 
-def work_start_keyboard():
+def twofa_reply_keyboard():
+    """2FA এর জন্য কীপ্যাড কিবোর্ড"""
     return {
-        "inline_keyboard": [
-            [{"text": "🚀 Start", "callback_data": "work_start"}],
-            [{"text": "❌ Cancel", "callback_data": "work_cancel"}]
-        ]
-    }
-
-def twofa_button_keyboard():
-    return {
-        "inline_keyboard": [
-            [{"text": "🔐 2FA দিন", "callback_data": "twofa_prompt"}],
-            [{"text": "❌ বাতিল করুন", "callback_data": "work_cancel"}]
-        ]
+        "keyboard": [
+            ["🔐 Enter 2FA"],
+            ["❌ Cancel"]
+        ],
+        "resize_keyboard": True
     }
 
 def yes_no_keyboard():
     return {
-        "inline_keyboard": [
-            [{"text": "✅ হ্যাঁ, সম্পন্ন", "callback_data": "follow_yes"},
-             {"text": "❌ না, এখনো করিনি", "callback_data": "follow_no"}]
-        ]
+        "keyboard": [
+            ["✅ Yes", "❌ No"]
+        ],
+        "resize_keyboard": True
     }
 
-def next_or_cancel():
+def next_or_cancel_keyboard():
     return {
-        "inline_keyboard": [
-            [{"text": "🔄 আরেকটি অ্যাকাউন্ট খুলুন", "callback_data": "work_start"}],
-            [{"text": "❌ বন্ধ করুন", "callback_data": "work_cancel"}]
-        ]
-    }
-
-def cancel_keyboard():
-    return {
-        "inline_keyboard": [
-            [{"text": "❌ বাতিল করুন", "callback_data": "work_cancel"}]
-        ]
+        "keyboard": [
+            ["🔄 Open Another Account"],
+            ["❌ Cancel"]
+        ],
+        "resize_keyboard": True
     }
 
 def withdraw_method_keyboard():
     return {
-        "inline_keyboard": [
-            [{"text": "💸 বিকাশ", "callback_data": "withdraw_bkash"},
-             {"text": "💸 নগদ", "callback_data": "withdraw_nagad"}],
-            [{"text": "❌ বাতিল", "callback_data": "withdraw_cancel"}]
-        ]
+        "keyboard": [
+            ["💸 bKash", "💸 Nagad"],
+            ["❌ Cancel"]
+        ],
+        "resize_keyboard": True
     }
 
-# ================== ক্রেডেনশিয়াল ==================
+def cancel_keyboard():
+    return {
+        "keyboard": [
+            ["❌ Cancel"]
+        ],
+        "resize_keyboard": True
+    }
+
+# ================== CREDENTIALS MANAGEMENT ==================
 def get_available_credential():
     with data_lock:
         for cred in credentials:
@@ -291,7 +272,7 @@ def delete_credential_by_index(index):
             return deleted
     return None
 
-# ================== সেশন ==================
+# ================== SESSION MANAGEMENT ==================
 def get_session(chat_id):
     return user_sessions.get(str(chat_id))
 
@@ -303,7 +284,7 @@ def clear_session(chat_id):
     user_sessions.pop(str(chat_id), None)
     save_all()
 
-# ================== ব্যাকআপ সিস্টেম ==================
+# ================== BACKUP SYSTEM ==================
 MAX_PART_SIZE = 45 * 1024 * 1024
 
 def cleanup_old_channel_backup():
@@ -323,13 +304,13 @@ def cleanup_old_channel_backup():
         if last_backup_message_id:
             delete_message(channel_id, last_backup_message_id)
     except Exception as e:
-        logger.error(f"ব্যাকআপ ক্লিনআপ error: {e}")
+        logger.error(f"Backup cleanup error: {e}")
 
 def save_data_to_channel():
     global last_backup_message_id, last_backup_part_ids
     channel_id = config.get("channel_id")
     if not channel_id:
-        logger.warning("ব্যাকআপ চ্যানেল আইডি সেট নেই!")
+        logger.warning("Backup channel ID not set!")
         return
 
     with backup_lock:
@@ -363,7 +344,7 @@ def save_data_to_channel():
                 if resp.status_code == 200 and resp.json().get("ok"):
                     new_backup_ids = [resp.json()["result"]["message_id"]]
                 else:
-                    logger.error("একক ব্যাকআপ পাঠাতে ব্যর্থ")
+                    logger.error("Failed to send single backup")
                     return
             else:
                 chunks = [compressed[i:i+MAX_PART_SIZE] for i in range(0, len(compressed), MAX_PART_SIZE)]
@@ -374,14 +355,14 @@ def save_data_to_channel():
                     part_filename = f"backup_{timestamp}_part{idx}of{total}.json.gz"
                     resp = s.post(
                         f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
-                        data={"chat_id": channel_id, "caption": f"পার্ট {idx}/{total}"},
+                        data={"chat_id": channel_id, "caption": f"Part {idx}/{total}"},
                         files={"document": (part_filename, chunk, "application/gzip")},
                         timeout=60
                     )
                     if resp.status_code == 200 and resp.json().get("ok"):
                         part_ids.append(resp.json()["result"]["message_id"])
                     else:
-                        logger.error(f"পার্ট {idx} পাঠাতে ব্যর্থ")
+                        logger.error(f"Failed to send part {idx}")
                         return
                 index_data = {
                     "backup_id": timestamp,
@@ -399,7 +380,7 @@ def save_data_to_channel():
                     new_backup_ids = [resp.json()["result"]["message_id"]]
                     new_part_ids = part_ids
                 else:
-                    logger.error("ইনডেক্স মেসেজ পাঠাতে ব্যর্থ")
+                    logger.error("Failed to send index message")
                     return
 
             cleanup_old_channel_backup()
@@ -415,9 +396,9 @@ def save_data_to_channel():
                 )
                 last_backup_message_id = new_backup_ids[0]
                 last_backup_part_ids = new_part_ids
-                logger.info("ব্যাকআপ সফলভাবে সংরক্ষিত হয়েছে")
+                logger.info("Backup successfully saved to channel")
         except Exception as e:
-            logger.error(f"ব্যাকআপ সেভ error: {e}")
+            logger.error(f"Backup error: {e}")
 
 def auto_backup_loop():
     while True:
@@ -430,7 +411,7 @@ def auto_restore_from_channel():
 
     channel_id = config.get("channel_id")
     if not channel_id:
-        logger.warning("ব্যাকআপ চ্যানেল আইডি সেট নেই")
+        logger.warning("Backup channel ID not set")
         return
 
     try:
@@ -440,12 +421,12 @@ def auto_restore_from_channel():
             timeout=20
         ).json()
         if not resp.get("ok"):
-            logger.error("চ্যানেল অ্যাক্সেস করা যাচ্ছে না")
+            logger.error("Cannot access channel")
             return
 
         pinned = resp["result"].get("pinned_message")
         if not pinned:
-            logger.info("পিন করা ব্যাকআপ নেই")
+            logger.info("No pinned backup")
             return
 
         compressed = None
@@ -475,7 +456,7 @@ def auto_restore_from_channel():
                     timeout=20
                 ).json()
                 if not msg_resp.get("ok") or "document" not in msg_resp.get("result", {}):
-                    logger.error(f"পার্ট {part_msg_id} পাওয়া যায়নি")
+                    logger.error(f"Part {part_msg_id} not found")
                     return
                 file_id = msg_resp["result"]["document"]["file_id"]
                 file_info = s.get(
@@ -513,26 +494,20 @@ def auto_restore_from_channel():
             last_backup_message_id = pinned["message_id"]
             save_all()
 
-        logger.info(f"ডেটা রিস্টোর করা হয়েছে: {len(subscribed_users)} ইউজার, {len(credentials)} ক্রেডেনশিয়াল")
+        logger.info(f"Data restored: {len(subscribed_users)} users, {len(credentials)} credentials")
     except Exception as e:
-        logger.error(f"অটো রিস্টোর error: {e}")
+        logger.error(f"Auto restore error: {e}")
 
-# ================== অ্যাডমিন ফাংশন ==================
+# ================== ADMIN FUNCTIONS ==================
 def admin_panel(chat_id):
-    send_message("⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**", chat_id, reply_markup=admin_keyboard())
+    send_message("⚙️ **Admin Control Panel**", chat_id, reply_markup=admin_keyboard())
 
 def admin_add_creds_prompt(chat_id):
     admin_cred_upload_session[chat_id] = {"step": "email"}
     send_message(
-        "📧 **ইমেইল লিস্ট দিন**\n\n"
-        "প্রতি লাইনে একটি ইমেইল লিখুন:\n\n"
-        "উদাহরণ:\n"
-        "`user1@gmail.com`\n"
-        "`user2@yahoo.com`\n"
-        "`user3@outlook.com`\n\n"
-        "বাতিল করতে `/cancel` লিখুন।",
+        "📧 **Enter Email List**\n\nOne per line:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nType /cancel to abort.",
         chat_id,
-        reply_markup={"inline_keyboard": [[{"text": "❌ বাতিল", "callback_data": "admin_cancel"}]]}
+        reply_markup={"keyboard": [["❌ Cancel"]], "resize_keyboard": True}
     )
 
 def process_admin_creds_email(chat_id, text):
@@ -543,18 +518,14 @@ def process_admin_creds_email(chat_id, text):
     valid_emails = [e for e in emails if '@' in e]
     
     if not valid_emails:
-        send_message("❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**", chat_id)
+        send_message("❌ **No valid emails found.**", chat_id)
         return True
     
-    invalid_count = len(emails) - len(valid_emails)
     admin_cred_upload_session[chat_id]["emails"] = valid_emails
     admin_cred_upload_session[chat_id]["step"] = "password"
     
-    msg = f"✅ **{len(valid_emails)}** টি ইমেইল গ্রহণ করা হয়েছে।"
-    if invalid_count > 0:
-        msg += f"\n⚠️ {invalid_count} টি ইনভ্যালিড ইমেইল বাদ পড়েছে।"
-    
-    msg += "\n\n🔑 **এখন পাসওয়ার্ড দিন** (সব অ্যাকাউন্টের জন্য একটি পাসওয়ার্ড):"
+    msg = f"✅ **{len(valid_emails)} emails accepted.**"
+    msg += "\n\n🔑 **Enter the password** (same for all accounts):"
     send_message(msg, chat_id)
     return True
 
@@ -564,7 +535,7 @@ def process_admin_creds_password(chat_id, text):
     
     password = text.strip()
     if not password:
-        send_message("❌ **পাসওয়ার্ড খালি রাখা যাবে না।**", chat_id)
+        send_message("❌ **Password cannot be empty.**", chat_id)
         return True
     
     emails = admin_cred_upload_session[chat_id]["emails"]
@@ -582,93 +553,52 @@ def process_admin_creds_password(chat_id, text):
     
     del admin_cred_upload_session[chat_id]
     send_message(
-        f"✅ **{added}** টি অ্যাকাউন্ট যোগ করা হয়েছে।\n"
-        f"📦 **মোট:** {len(credentials)} টি ক্রেডেনশিয়াল",
+        f"✅ **{added} accounts added.** Total: {len(credentials)}",
         chat_id, reply_markup=admin_keyboard()
     )
     return True
 
-def admin_list_creds(chat_id, page=0, message_id=None):
+def admin_list_creds(chat_id):
     total = len(credentials)
-    if total == 0:
-        send_message("📭 **কোনো ক্রেডেনশিয়াল নেই।**", chat_id, reply_markup=admin_keyboard())
-        return
-
-    per_page = 10
-    total_pages = (total + per_page - 1) // per_page
-    page = max(0, min(page, total_pages - 1))
-    start = page * per_page
-    end = min(start + per_page, total)
-    page_items = credentials[start:end]
-
-    lines = [f"📋 **ক্রেডেনশিয়াল লিস্ট** (পৃষ্ঠা {page+1}/{total_pages})\n"]
-    lines.append("ইমেইল | পাসওয়ার্ড | স্ট্যাটাস\n")
-    lines.append("---|---|---\n")
-
-    for idx, cred in enumerate(page_items, start=start):
-        status = "🟢 অব্যবহৃত" if not cred.get("used", False) else f"🔴 ব্যবহৃত ({cred.get('assigned_to', 'N/A')})"
-        lines.append(f"`{cred['email']}` | `{cred['password']}` | {status}")
-
-    text = "\n".join(lines)
-    kb = {"inline_keyboard": []}
-
-    nav = []
-    if page > 0:
-        nav.append({"text": "⬅️ আগের", "callback_data": f"credpage_{page-1}"})
-    if page < total_pages - 1:
-        nav.append({"text": "➡️ পরের", "callback_data": f"credpage_{page+1}"})
-    if nav:
-        kb["inline_keyboard"].append(nav)
-
-    for i, cred in enumerate(page_items, start=start):
-        kb["inline_keyboard"].append([
-            {"text": f"🗑️ {i+1}. {cred['email']}", "callback_data": f"delcred_{i}"}
-        ])
-
-    kb["inline_keyboard"].append([{"text": "🔙 বন্ধ করুন", "callback_data": "close_credlist"}])
-
-    if message_id:
-        edit_message_text(chat_id, message_id, text, reply_markup=kb)
-    else:
-        send_message(text, chat_id, reply_markup=kb)
-
-def admin_delete_single_cred(chat_id, index, message_id):
-    deleted = delete_credential_by_index(index)
-    if deleted:
-        send_message(f"🗑️ `{deleted['email']}` ডিলিট করা হয়েছে।", chat_id)
-        admin_list_creds(chat_id, page=0, message_id=message_id)
-    else:
-        send_message("❌ ক্রেডেনশিয়াল পাওয়া যায়নি।", chat_id)
+    used = len([c for c in credentials if c.get("used", False)])
+    available = total - used
+    send_message(
+        f"📋 **Account List**\n\n"
+        f"Total: {total}\n"
+        f"Used: {used}\n"
+        f"Available: {available}",
+        chat_id, reply_markup=admin_keyboard()
+    )
 
 def admin_delete_all_creds(chat_id):
     with data_lock:
         count = len(credentials)
         credentials.clear()
         save_all()
-    send_message(f"🗑️ **{count}** টি সকল ক্রেডেনশিয়াল ডিলিট করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+    send_message(f"🗑️ **{count} accounts deleted.**", chat_id, reply_markup=admin_keyboard())
 
 def admin_stats(chat_id):
     total_creds = len(credentials)
     used_creds = len([c for c in credentials if c.get("used", False)])
     pending_withdraw = len([w for w in withdraw_requests if w["status"] == "pending"])
     send_message(
-        f"📊 **পরিসংখ্যান**\n\n"
-        f"👥 **মোট ইউজার:** {len(subscribed_users)}\n"
-        f"📦 **ক্রেডেনশিয়াল:** {total_creds} টি (ব্যবহৃত: {used_creds})\n"
-        f"💸 **পেন্ডিং উইথড্র:** {pending_withdraw} টি\n"
-        f"💰 **বর্তমান মূল্য:** {config.get('base_balance', 10.0)} টাকা প্রতি অ্যাকাউন্ট",
-        chat_id, parse_mode="Markdown", reply_markup=admin_keyboard()
+        f"📊 **Statistics**\n\n"
+        f"👥 Users: {len(subscribed_users)}\n"
+        f"📦 Credentials: {total_creds} (Used: {used_creds})\n"
+        f"💸 Pending Withdraw: {pending_withdraw}\n"
+        f"💰 Price per account: {config.get('base_balance', 10.0)} BDT",
+        chat_id, reply_markup=admin_keyboard()
     )
 
 def admin_show_withdraw_requests(chat_id):
     pending = [w for w in withdraw_requests if w["status"] == "pending"]
     if not pending:
-        send_message("📭 **কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই।**", chat_id, reply_markup=admin_keyboard())
+        send_message("📭 **No pending withdraw requests.**", chat_id, reply_markup=admin_keyboard())
         return
-    msg = "📥 **পেন্ডিং উইথড্র রিকোয়েস্ট**\n\n"
+    msg = "📥 **Pending Withdraw Requests**\n\n"
     for w in pending:
         msg += f"🆔 `{w['id']}` | 👤 `{w['user_id']}` | 💰 `{w['amount']}` | 💳 {w['method'].upper()}\n"
-    send_message(msg, chat_id, parse_mode="Markdown")
+    send_message(msg, chat_id)
 
 def admin_approve_withdraw(chat_id, w_id):
     with data_lock:
@@ -676,14 +606,13 @@ def admin_approve_withdraw(chat_id, w_id):
             if w["id"] == w_id and w["status"] == "pending":
                 w["status"] = "approved"
                 save_all()
-                send_message(f"✅ **উইথড্র {w_id}** অনুমোদিত হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                send_message(f"✅ **Withdraw {w_id} approved.**", chat_id, reply_markup=admin_keyboard())
                 send_message(
-                    f"✅ আপনার **{w['amount']}** টাকা উইথড্র অনুমোদন করা হয়েছে।\n"
-                    f"আপনার {w['method'].upper()} অ্যাকাউন্টে টাকা পাঠানো হবে।",
+                    f"✅ Your withdraw of **{w['amount']}** BDT has been approved.",
                     w["user_id"]
                 )
                 return
-    send_message(f"❌ {w_id} পাওয়া যায়নি।", chat_id)
+    send_message(f"❌ {w_id} not found.", chat_id)
 
 def admin_reject_withdraw(chat_id, w_id):
     with data_lock:
@@ -692,19 +621,18 @@ def admin_reject_withdraw(chat_id, w_id):
                 w["status"] = "rejected"
                 add_balance(w["user_id"], w["amount"])
                 save_all()
-                send_message(f"❌ **উইথড্র {w_id}** বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                send_message(f"❌ **Withdraw {w_id} rejected.**", chat_id, reply_markup=admin_keyboard())
                 send_message(
-                    f"❌ আপনার উইথড্র রিকোয়েস্ট বাতিল করা হয়েছে।\n"
-                    f"**{w['amount']}** টাকা আপনার ব্যালেন্সে ফেরত দেয়া হয়েছে।",
+                    f"❌ Your withdraw request was rejected. **{w['amount']}** BDT has been refunded.",
                     w["user_id"]
                 )
                 return
-    send_message(f"❌ {w_id} পাওয়া যায়নি।", chat_id)
+    send_message(f"❌ {w_id} not found.", chat_id)
 
 def admin_set_price(chat_id, text):
     parts = text.split()
     if len(parts) != 2:
-        send_message("❌ **ফরম্যাট:** `/setprice <amount>`", chat_id)
+        send_message("❌ **Usage:** `/setprice <amount>`", chat_id)
         return
     try:
         price = float(parts[1])
@@ -712,57 +640,39 @@ def admin_set_price(chat_id, text):
             raise ValueError
         config["base_balance"] = price
         save_all()
-        send_message(f"✅ প্রতি অ্যাকাউন্ট খোলার ইনকাম **{price}** টাকা সেট করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+        send_message(f"✅ Price per account set to **{price}** BDT.", chat_id, reply_markup=admin_keyboard())
     except:
-        send_message("❌ সঠিক টাকার পরিমাণ দিন।", chat_id)
-
-def admin_set_bkash(chat_id, text):
-    parts = text.split()
-    if len(parts) != 2:
-        send_message("❌ **ফরম্যাট:** `/setbkash <নম্বর>`", chat_id)
-        return
-    config["bkash_number"] = parts[1]
-    save_all()
-    send_message(f"✅ বিকাশ নম্বর **{parts[1]}** সেট করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
-
-def admin_set_nagad(chat_id, text):
-    parts = text.split()
-    if len(parts) != 2:
-        send_message("❌ **ফরম্যাট:** `/setnagad <নম্বর>`", chat_id)
-        return
-    config["nagad_number"] = parts[1]
-    save_all()
-    send_message(f"✅ নগদ নম্বর **{parts[1]}** সেট করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+        send_message("❌ Invalid amount.", chat_id)
 
 def admin_set_rules(chat_id, text):
     parts = text.split(" ", 1)
     if len(parts) != 2:
-        send_message("❌ **ফরম্যাট:** `/setrules <নতুন নিয়ম>`", chat_id)
+        send_message("❌ **Usage:** `/setrules <new rules>`", chat_id)
         return
     config["work_rules"] = parts[1]
     save_all()
-    send_message("✅ **নিয়মাবলী আপডেট করা হয়েছে।**", chat_id, reply_markup=admin_keyboard())
+    send_message("✅ **Rules updated.**", chat_id, reply_markup=admin_keyboard())
 
 def admin_set_channel(chat_id, text):
     parts = text.split()
     if len(parts) != 2:
-        send_message("❌ **ফরম্যাট:** `/setchannel <চ্যানেল_আইডি>`", chat_id)
+        send_message("❌ **Usage:** `/setchannel <channel_id>`", chat_id)
         return
     config["channel_id"] = parts[1]
     save_all()
-    send_message(f"✅ চ্যানেল আইডি **{parts[1]}** সেট করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+    send_message(f"✅ Channel ID set to `{parts[1]}`.", chat_id, reply_markup=admin_keyboard())
 
 def admin_backup(chat_id):
-    send_message("⏳ **ব্যাকআপ নেওয়া হচ্ছে...**", chat_id)
+    send_message("⏳ **Creating backup...**", chat_id)
     save_data_to_channel()
-    send_message("✅ **ব্যাকআপ সম্পন্ন!**", chat_id, reply_markup=admin_keyboard())
+    send_message("✅ **Backup completed!**", chat_id, reply_markup=admin_keyboard())
 
 def admin_restore(chat_id):
-    send_message("⏳ **রিস্টোর করা হচ্ছে...**", chat_id)
+    send_message("⏳ **Restoring data...**", chat_id)
     auto_restore_from_channel()
-    send_message("✅ **রিস্টোর সম্পন্ন!**", chat_id, reply_markup=admin_keyboard())
+    send_message("✅ **Restore completed!**", chat_id, reply_markup=admin_keyboard())
 
-# ================== ইউজার কমান্ড ==================
+# ================== USER COMMANDS ==================
 def start_command(chat_id, chat_type="private"):
     if chat_id not in subscribed_users:
         with data_lock:
@@ -775,61 +685,57 @@ def start_command(chat_id, chat_type="private"):
     
     if chat_type == "private":
         send_message(
-            "🤖 **Instagram অ্যাকাউন্ট খোলার বটে স্বাগতম!**\n\n"
-            "আমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\n"
-            "নিচের বাটন ব্যবহার করে শুরু করুন।",
+            "🤖 **Instagram Account Opener Bot**\n\n"
+            "I help you open Instagram accounts.\n"
+            "Use the buttons below to start.",
             chat_id, reply_markup=main_keyboard(chat_id)
         )
     else:
-        send_message(
-            "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\n"
-            "আমাকে প্রাইভেট চ্যাটে `/start` দিন।",
-            chat_id
-        )
+        send_message("🤖 I work in private chats. Please `/start` me in private.", chat_id)
 
 def instagram_work(chat_id):
-    if get_session(chat_id) and get_session(chat_id).get("active"):
-        send_message("⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।", chat_id)
+    session = get_session(chat_id)
+    if session and session.get("active"):
+        send_message("⏳ You already have an active session. Please finish or cancel it.", chat_id)
         return
-    rules = config.get("work_rules", "📱 Instagram অ্যাকাউন্ট খোলার নিয়মাবলী")
+    rules = config.get("work_rules", "📱 Instagram Account Opening Guidelines")
     send_message(
         f"{rules}\n\n"
-        f"👇 **Start** বাটনে ক্লিক করে শুরু করুন।",
-        chat_id, reply_markup=work_start_keyboard()
+        f"👇 Press **Start** to begin.",
+        chat_id, reply_markup={"keyboard": [["🚀 Start"], ["❌ Cancel"]], "resize_keyboard": True}
     )
 
 def start_work(chat_id):
     cred = get_available_credential()
     if not cred:
-        send_message("❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!**\nঅ্যাডমিনের সাথে যোগাযোগ করুন।", chat_id, reply_markup=main_keyboard(chat_id))
+        send_message("❌ **No available accounts!** Please contact admin.", chat_id, reply_markup=main_keyboard(chat_id))
         return
     assign_credential_to_user(cred, chat_id)
     set_session(chat_id, {
-        "active": True, 
-        "step": "credentials_shown", 
-        "email": cred["email"], 
+        "active": True,
+        "step": "credentials_shown",
+        "email": cred["email"],
         "password": cred["password"],
         "twofa": None
     })
     
     send_message(
-        f"✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n"
-        f"📧 **ইমেইল:** `{cred['email']}`\n"
-        f"🔑 **পাসওয়ার্ড:** `{cred['password']}`\n\n"
-        f"🔐 **2FA দিন** বাটনে ক্লিক করে 2FA কোড দিন:",
-        chat_id, reply_markup=twofa_button_keyboard()
+        f"✅ **Your account has been assigned:**\n\n"
+        f"📧 **Email:** `{cred['email']}`\n"
+        f"🔑 **Password:** `{cred['password']}`\n\n"
+        f"🔐 Press the button below to enter your 2FA code:",
+        chat_id, reply_markup=twofa_reply_keyboard()
     )
 
 def prompt_twofa(chat_id):
     session = get_session(chat_id)
     if not session or not session.get("active"):
         return
-    
     session["step"] = "twofa_input"
     set_session(chat_id, session)
     
     send_message(
-        "🔐 **2FA কোড দিন:**",
+        "🔐 **Please enter your 2FA code:**",
         chat_id, reply_markup=cancel_keyboard()
     )
 
@@ -838,16 +744,13 @@ def process_twofa(chat_id, text):
     if not session or not session.get("active") or session.get("step") != "twofa_input":
         return False
     
-    twofa_code = text.strip()
-    session["twofa"] = twofa_code
-    
+    session["twofa"] = text.strip()
     session["step"] = "follow"
     set_session(chat_id, session)
     
     send_message(
-        "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\n"
-        "এখন **৫টি প্রোফাইল ফলো** করুন।\n"
-        "প্রত্যেকটি প্রোফাইলের ছবি দিয়ে ফলো করেছেন?",
+        "✅ **2FA verified!**\n\n"
+        "Now follow **5 profiles**. Have you followed them?",
         chat_id, reply_markup=yes_no_keyboard()
     )
     return True
@@ -865,19 +768,18 @@ def process_follow_yes(chat_id):
         user_info[uid]["total_accounts"] = user_info[uid].get("total_accounts", 0) + 1
         save_json(USER_INFO_FILE, user_info)
     send_message(
-        f"🎉 **অভিনন্দন! আপনার অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n"
-        f"📧 **ইমেইল:** `{session['email']}`\n"
-        f"🔑 **পাসওয়ার্ড:** `{session['password']}`\n"
+        f"🎉 **Congratulations! Account opening completed!**\n\n"
+        f"📧 **Email:** `{session['email']}`\n"
+        f"🔑 **Password:** `{session['password']}`\n"
         f"🔐 **2FA:** {session.get('twofa', 'N/A')}\n\n"
-        f"💰 **{price}** টাকা আপনার ব্যালেন্সে যোগ হয়েছে।\n\n"
-        f"আবার নতুন অ্যাকাউন্ট খুলতে নিচের বাটন চাপুন।",
-        chat_id, reply_markup=next_or_cancel()
+        f"💰 **{price}** BDT added to your balance.",
+        chat_id, reply_markup=next_or_cancel_keyboard()
     )
     clear_session(chat_id)
 
 def process_follow_no(chat_id):
     send_message(
-        "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
+        "⚠️ **Please follow 5 profiles** and then press **Yes**.",
         chat_id, reply_markup=yes_no_keyboard()
     )
 
@@ -888,16 +790,15 @@ def show_balance(chat_id):
 def withdraw_start(chat_id):
     clear_session(chat_id)
     send_message(
-        "💸 **উইথড্র করুন**\n\n"
-        "আপনার টাকা উত্তোলনের মাধ্যম নির্বাচন করুন:",
+        "💸 **Withdraw**\n\nChoose your withdrawal method:",
         chat_id, reply_markup=withdraw_method_keyboard()
     )
 
 def withdraw_request(chat_id, method):
     set_session(chat_id, {"withdraw_step": "account", "method": method})
     send_message(
-        f"📞 আপনার {method.upper()} অ্যাকাউন্ট নম্বর দিন:",
-        chat_id, reply_markup={"inline_keyboard": [[{"text": "❌ বাতিল", "callback_data": "withdraw_cancel"}]]}
+        f"📞 Enter your {method.upper()} account number:",
+        chat_id, reply_markup=cancel_keyboard()
     )
 
 def process_withdraw_account(chat_id, text):
@@ -908,8 +809,8 @@ def process_withdraw_account(chat_id, text):
     session["withdraw_step"] = "amount"
     set_session(chat_id, session)
     send_message(
-        "💰 **কত টাকা উইথড্র করতে চান?**\n(শুধু সংখ্যা লিখুন)",
-        chat_id, reply_markup={"inline_keyboard": [[{"text": "❌ বাতিল", "callback_data": "withdraw_cancel"}]]}
+        "💰 **Enter the amount** you want to withdraw:",
+        chat_id, reply_markup=cancel_keyboard()
     )
     return True
 
@@ -922,11 +823,11 @@ def process_withdraw_amount(chat_id, text):
         if amount <= 0:
             raise ValueError
     except:
-        send_message("❌ **সঠিক টাকার পরিমাণ দিন।**", chat_id)
+        send_message("❌ **Enter a valid amount.**", chat_id)
         return False
     uid = str(chat_id)
     if user_balances.get(uid, 0.0) < amount:
-        send_message("❌ **অপর্যাপ্ত ব্যালেন্স!**", chat_id)
+        send_message("❌ **Insufficient balance!**", chat_id)
         return False
     w_id = uuid.uuid4().hex[:10]
     withdraw_requests.append({
@@ -937,26 +838,21 @@ def process_withdraw_amount(chat_id, text):
     deduct_balance(chat_id, amount)
     save_all()
     send_message(
-        f"✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n"
-        f"🆔 **আইডি:** `{w_id}`\n"
-        f"💰 **পরিমাণ:** {amount} টাকা\n"
-        f"📌 স্ট্যাটাস: ⏳ পেন্ডিং\n\n"
-        f"অ্যাডমিন অনুমোদন দিলে টাকা পাঠানো হবে।",
+        f"✅ **Withdraw request submitted!**\n"
+        f"🆔 **ID:** `{w_id}`\n"
+        f"💰 **Amount:** {amount} BDT\n"
+        f"📌 Status: ⏳ Pending",
         chat_id, reply_markup=main_keyboard(chat_id)
     )
     send_message(
-        f"📥 **নতুন উইথড্র রিকোয়েস্ট**\n\n"
-        f"🆔 `{w_id}`\n"
-        f"👤 ইউজার: `{chat_id}`\n"
-        f"💰 {amount} টাকা\n"
-        f"💳 {session['method'].upper()}\n"
-        f"📞 {session['account']}",
+        f"📥 **New Withdraw Request**\n"
+        f"🆔 `{w_id}`\n👤 User: `{chat_id}`\n💰 {amount} BDT\n💳 {session['method'].upper()}\n📞 {session['account']}",
         ADMIN_CHAT_ID
     )
     clear_session(chat_id)
     return True
 
-# ================== আপডেট হ্যান্ডলার ==================
+# ================== UPDATE HANDLER ==================
 last_update_id = 0
 
 def handle_updates():
@@ -973,7 +869,7 @@ def handle_updates():
                     last_update_id = update["update_id"]
                     process_update(update)
         except Exception as e:
-            logger.error(f"আপডেট লুপ error: {e}")
+            logger.error(f"Update loop error: {e}")
         time.sleep(1)
 
 def process_update(update):
@@ -996,12 +892,12 @@ def process_update(update):
                 subscribed_users.add(chat_id)
                 save_all()
 
-        # ===== অ্যাডমিন =====
+        # ===== ADMIN SECTION =====
         if chat_id == ADMIN_CHAT_ID:
             if chat_id in admin_cred_upload_session:
-                if text == "/cancel":
+                if text == "/cancel" or text == "❌ Cancel":
                     del admin_cred_upload_session[chat_id]
-                    send_message("❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                    send_message("❌ Cancelled.", chat_id, reply_markup=admin_keyboard())
                     return
                 
                 step = admin_cred_upload_session[chat_id].get("step")
@@ -1011,54 +907,42 @@ def process_update(update):
                     process_admin_creds_password(chat_id, text)
                 return
 
-            if text == "⚙️ অ্যাডমিন প্যানেল":
+            if text == "⚙️ Admin Panel":
                 admin_panel(chat_id)
                 return
-            if text == "➕ অ্যাকাউন্ট যোগ":
+            if text == "➕ Add Accounts":
                 admin_add_creds_prompt(chat_id)
                 return
-            if text == "📋 অ্যাকাউন্ট লিস্ট":
+            if text == "📋 Account List":
                 admin_list_creds(chat_id)
                 return
-            if text == "🗑️ অ্যাকাউন্ট ডিলিট":
+            if text == "🗑️ Delete All":
                 admin_delete_all_creds(chat_id)
                 return
-            if text == "📊 পরিসংখ্যান":
+            if text == "📊 Statistics":
                 admin_stats(chat_id)
                 return
-            if text == "📥 উইথড্র রিকোয়েস্ট":
+            if text == "📥 Withdraw Requests":
                 admin_show_withdraw_requests(chat_id)
                 return
-            if text == "📁 ব্যাকআপ":
+            if text == "📁 Backup":
                 admin_backup(chat_id)
                 return
-            if text == "📥 রিস্টোর":
+            if text == "📥 Restore":
                 admin_restore(chat_id)
                 return
-            if text == "💲 মূল্য সেট":
+            if text == "💲 Set Price":
                 send_message("/setprice <amount>", chat_id, reply_markup=admin_keyboard())
                 return
-            if text == "💳 বিকাশ নম্বর সেট":
-                send_message("/setbkash <নম্বর>", chat_id, reply_markup=admin_keyboard())
+            if text == "📝 Edit Rules":
+                send_message("/setrules <new rules>", chat_id, reply_markup=admin_keyboard())
                 return
-            if text == "💳 নগদ নম্বর সেট":
-                send_message("/setnagad <নম্বর>", chat_id, reply_markup=admin_keyboard())
-                return
-            if text == "📝 নিয়ম পরিবর্তন":
-                send_message("/setrules <নতুন নিয়ম>", chat_id, reply_markup=admin_keyboard())
-                return
-            if text == "🔙 মূল মেনু":
-                send_message("🔙 মূল মেনুতে ফিরে যান।", chat_id, reply_markup=main_keyboard(chat_id))
+            if text == "🔙 Main Menu":
+                send_message("Main Menu", chat_id, reply_markup=main_keyboard(chat_id))
                 return
 
             if text.startswith("/setprice"):
                 admin_set_price(chat_id, text)
-                return
-            if text.startswith("/setbkash"):
-                admin_set_bkash(chat_id, text)
-                return
-            if text.startswith("/setnagad"):
-                admin_set_nagad(chat_id, text)
                 return
             if text.startswith("/setrules"):
                 admin_set_rules(chat_id, text)
@@ -1077,19 +961,57 @@ def process_update(update):
                     admin_reject_withdraw(chat_id, parts[1])
                 return
 
-        # ===== ইউজার =====
+        # ===== USER SECTION =====
+        session = get_session(chat_id)
+        
+        # ===== 2FA BUTTON HANDLER (Reply Keyboard) =====
+        if text == "🔐 Enter 2FA":
+            prompt_twofa(chat_id)
+            return
+
+        # ===== CANCEL & NAVIGATION =====
+        if text == "❌ Cancel" or text == "❌ বাতিল করুন":
+            clear_session(chat_id)
+            send_message("❌ Cancelled.", chat_id, reply_markup=main_keyboard(chat_id))
+            return
+
         if text == "📱 Instagram Work":
             instagram_work(chat_id)
             return
-        if text == "💰 ব্যালেন্স":
+        if text == "💰 Balance":
             show_balance(chat_id)
             return
-        if text == "💸 উইথড্র":
+        if text == "💸 Withdraw":
             withdraw_start(chat_id)
             return
+        
+        if text == "🚀 Start":
+            start_work(chat_id)
+            return
+        
+        # ===== YES/NO FOLLOW =====
+        if text == "✅ Yes":
+            process_follow_yes(chat_id)
+            return
+        if text == "❌ No":
+            process_follow_no(chat_id)
+            return
+        
+        if text == "🔄 Open Another Account":
+            # Clear old session and start new
+            clear_session(chat_id)
+            instagram_work(chat_id)
+            return
 
-        # ===== সেশন =====
-        session = get_session(chat_id)
+        # ===== WITHDRAW METHODS =====
+        if text == "💸 bKash":
+            withdraw_request(chat_id, "bkash")
+            return
+        if text == "💸 Nagad":
+            withdraw_request(chat_id, "nagad")
+            return
+
+        # ===== SESSION STEPS =====
         if session:
             if session.get("withdraw_step") == "account":
                 process_withdraw_account(chat_id, text)
@@ -1101,10 +1023,9 @@ def process_update(update):
                 process_twofa(chat_id, text)
                 return
 
-        # প্রাইভেটে অচেনা টেক্সট
+        # ===== UNKNOWN TEXT =====
         send_message(
-            "❌ আমি বুঝতে পারিনি।\n"
-            "দয়া করে /start দিন অথবা নিচের বাটন ব্যবহার করুন।",
+            "❌ I didn't understand that. Please use the buttons below.",
             chat_id, reply_markup=main_keyboard(chat_id)
         )
 
@@ -1112,50 +1033,20 @@ def process_update(update):
         cb = update["callback_query"]
         chat_id = str(cb["message"]["chat"]["id"])
         data = cb["data"]
-        message_id = cb["message"]["message_id"]
         answer_callback(cb["id"])
+        
+        # কিছু ইনলাইন বাটন থাকলে (যেমন, অ্যাডমিন পেজিনেশন বা কনফার্ম)
+        # আপনি চাইলে এখানে হ্যান্ডেল করতে পারেন, কিন্তু আমরা এখন রিপ্লাই কিবোর্ড ব্যবহার করছি।
 
-        if data == "work_start":
-            start_work(chat_id)
-        elif data == "work_cancel":
-            clear_session(chat_id)
-            send_message("❌ প্রক্রিয়া বাতিল করা হয়েছে।", chat_id, reply_markup=main_keyboard(chat_id))
-        elif data == "twofa_prompt":
-            prompt_twofa(chat_id)
-        elif data == "follow_yes":
-            process_follow_yes(chat_id)
-        elif data == "follow_no":
-            process_follow_no(chat_id)
-        elif data == "admin_cancel":
-            if chat_id in admin_cred_upload_session:
-                del admin_cred_upload_session[chat_id]
-            send_message("❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
-        elif data == "withdraw_bkash":
-            withdraw_request(chat_id, "bkash")
-        elif data == "withdraw_nagad":
-            withdraw_request(chat_id, "nagad")
-        elif data == "withdraw_cancel":
-            clear_session(chat_id)
-            send_message("❌ উইথড্র বাতিল করা হয়েছে।", chat_id, reply_markup=main_keyboard(chat_id))
-        elif data.startswith("credpage_"):
-            page = int(data.split("_")[1])
-            admin_list_creds(chat_id, page=page, message_id=message_id)
-        elif data.startswith("delcred_"):
-            index = int(data.split("_")[1])
-            admin_delete_single_cred(chat_id, index, message_id)
-        elif data == "close_credlist":
-            delete_message(chat_id, message_id)
-            send_message("📋 তালিকা বন্ধ করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
-
-# ================== ফ্লাস্ক ==================
+# ================== FLASK ==================
 @app.route("/")
 def home():
     return "🤖 Bot is Running!"
 
-# ================== মেইন ==================
+# ================== MAIN ==================
 if __name__ == "__main__":
     load_all()
-    logger.info(f"লোড হয়েছে: {len(subscribed_users)} ইউজার, {len(credentials)} ক্রেডেনশিয়াল")
+    logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials")
 
     auto_restore_from_channel()
 
