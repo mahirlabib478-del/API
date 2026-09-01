@@ -118,6 +118,7 @@ def save_all():
     save_json(USER_BALANCES_FILE, user_balances)
     save_json(USER_INFO_FILE, user_info)
     save_json(LANGUAGE_FILE, user_language)    
+    trigger_backup()
     
 
 # ================== DEBOUNCED BACKUP ==================
