@@ -6,6 +6,7 @@ import threading
 import uuid
 import gzip
 import requests
+import pyotp  # ✅ নতুন যোগ
 from flask import Flask
 from datetime import datetime
 import openpyxl
@@ -119,7 +120,6 @@ def save_all():
     save_json(USER_INFO_FILE, user_info)
     save_json(LANGUAGE_FILE, user_language)    
     trigger_backup()
-    
 
 # ================== DEBOUNCED BACKUP ==================
 def trigger_backup():
@@ -210,10 +210,10 @@ def t(key, user_id, **kwargs):
             "invalid_amount": "❌ **Enter a valid amount.**",
             "account_assigned": "✅ **Your account has been assigned:**\n\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n\nPlease tap the button below and enter your **Instagram username**:",
             "enter_username_prompt": "👤 **Please enter your actual Instagram username:**",
-            "twofa_prompt": "🔐 **Please enter your 2FA code:**",
-            "twofa_verified": "✅ **2FA verified!**\n\nNow follow **5 profiles & set profile picture**. Have you done that?",
+            "twofa_prompt": "🔐 **Please enter your 2FA secret key:**\n(e.g., JBSWY3DPEHPK3PXP)\nBot will auto-generate the code.",
+            "twofa_verified": "✅ **2FA code auto-generated!**\n🔐 Code: `{code}`\n\nNow follow **5 profiles & set profile picture**. Have you done that?",
             "follow_yes": "⚠️ **Please follow 5 profiles & set profile picture** then press **Yes**.",
-            "completed": "🎉 **Account opening completed!**\n\n👤 **Username:** `{username}`\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA:** {twofa}\n\n⏳ **Your account is now pending admin approval. You will receive balance once approved.**",
+            "completed": "🎉 **Account opening completed!**\n\n👤 **Username:** `{username}`\n📧 **Email:** `{email}`\n🔑 **Password:** `{password}`\n🔐 **2FA Secret:** {twofa}\n\n⏳ **Your account is now pending admin approval. You will receive balance once approved.**",
             "no_accounts": "❌ **No available accounts!** Please contact admin.",
             "active_session": "⏳ You already have an active session. Please finish or cancel it.",
             "under_maintenance": "🔧 **Bot is under maintenance. Please try later.**",
@@ -267,10 +267,10 @@ def t(key, user_id, **kwargs):
             "invalid_amount": "❌ **সঠিক টাকার পরিমাণ দিন।**",
             "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\nনিচের বাটনে ক্লিক করে আপনার **Instagram ইউজারনেম** দিন:",
             "enter_username_prompt": "👤 **আপনার প্রকৃত Instagram ইউজারনেম দিন:**",
-            "twofa_prompt": "🔐 **2FA কোড দিন:**",
-            "twofa_verified": "✅ **2FA প্রক্রিয়া সম্পন্ন!**\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
+            "twofa_prompt": "🔐 **আপনার 2FA সিক্রেট কী দিন:**\n(যেমন: JBSWY3DPEHPK3PXP)\nবট নিজেই কোড জেনারেট করবে।",
+            "twofa_verified": "✅ **2FA কোড অটো-জেনারেট করা হয়েছে!**\n🔐 কোড: `{code}`\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
             "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
-            "completed": "🎉 **অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n👤 **ইউজারনেম:** `{username}`\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA:** {twofa}\n\n⏳ **আপনার অ্যাকাউন্টটি এখন অ্যাডমিন অনুমোদনের অপেক্ষায়। অনুমোদন পেলে ব্যালেন্স যোগ হবে।**",
+            "completed": "🎉 **অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n👤 **ইউজারনেম:** `{username}`\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA সিক্রেট:** {twofa}\n\n⏳ **আপনার অ্যাকাউন্টটি এখন অ্যাডমিন অনুমোদনের অপেক্ষায়। অনুমোদন পেলে ব্যালেন্স যোগ হবে।**",
             "no_accounts": "❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!** অ্যাডমিনের সাথে যোগাযোগ করুন।",
             "active_session": "⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।",
             "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
@@ -365,7 +365,7 @@ def admin_keyboard():
             ["📥 Restore", f"🔧 Maintenance {maint_status}"],
             ["📋 Pending Approvals", "📥 Export Excel"],
             ["📤 Upload Approved", "📤 Upload Rejected"],
-            ["🗑️ Clear Exported Accounts", "🔙 Main Menu"]   # 👈 নতুন বাটন
+            ["🗑️ Clear Exported Accounts", "🔙 Main Menu"]
         ],
         "resize_keyboard": True
     }
@@ -465,7 +465,7 @@ def save_created_account(username, email, password, twofa, user_id):
             "username": username,
             "email": email,
             "password": password,
-            "twofa": twofa,
+            "twofa": twofa,  # এখানে সিক্রেট কী সংরক্ষিত হবে
             "user_id": str(user_id),
             "timestamp": time.time(),
             "status": "pending"
@@ -591,7 +591,7 @@ def generate_created_accounts_excel():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Created Accounts"
-    headers = ["ID", "Username", "Email", "Password", "2FA", "User ID", "Status", "Timestamp"]
+    headers = ["ID", "Username", "Email", "Password", "2FA Secret", "User ID", "Status", "Timestamp"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True)
@@ -1321,13 +1321,35 @@ def process_username(chat_id, text):
     return True
 
 def process_twofa(chat_id, text):
+    """ইউজারের দেওয়া 2FA সিক্রেট কী থেকে অটো কোড জেনারেট করে"""
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "twofa":
         return False
-    session["twofa"] = text.strip()
+    
+    secret_key = text.strip()
+    
+    # সিক্রেট কী ভ্যালিডেশন (Base32 ফরম্যাট)
+    try:
+        totp = pyotp.TOTP(secret_key)
+        current_code = totp.now()
+        logger.info(f"2FA code generated for user {chat_id}: {current_code}")
+        
+        # সেশন আপডেট
+        session["twofa"] = secret_key          # সিক্রেট কী সংরক্ষণ
+        session["twofa_code"] = current_code   # জেনারেটেড কোড (যদি দরকার হয়)
+        
+    except Exception as e:
+        send_message("❌ **ভুল 2FA সিক্রেট কী!** দয়া করে সঠিক Base32 ফরম্যাটের কী দিন।", chat_id)
+        return True
+    
     session["step"] = "follow"
     set_session(chat_id, session)
-    send_message(t("twofa_verified", chat_id), chat_id, reply_markup=yes_no_keyboard(chat_id))
+    
+    # সফল জেনারেশন
+    send_message(
+        t("twofa_verified", chat_id, code=current_code),
+        chat_id, reply_markup=yes_no_keyboard(chat_id)
+    )
     return True
 
 def process_follow_yes(chat_id):
@@ -1337,14 +1359,14 @@ def process_follow_yes(chat_id):
     session["step"] = "done"
     set_session(chat_id, session)
     username = session.get("username", "N/A")
-    twofa = session.get("twofa", "N/A")
-    save_created_account(username, session["email"], session["password"], twofa, chat_id)
+    twofa_secret = session.get("twofa", "N/A")   # সিক্রেট কী
+    save_created_account(username, session["email"], session["password"], twofa_secret, chat_id)
     send_message(
         t("completed", chat_id,
           username=username,
           email=session['email'],
           password=session['password'],
-          twofa=twofa),
+          twofa=twofa_secret),
         chat_id, reply_markup=next_or_cancel_keyboard(chat_id)
     )
     clear_session(chat_id)
@@ -1572,7 +1594,7 @@ def process_update(update):
             if text == "📤 Upload Rejected":
                 admin_upload_rejected_prompt(chat_id)
                 return
-            if text == "🗑️ Clear Exported Accounts":   # 👈 নতুন বাটন হ্যান্ডলার
+            if text == "🗑️ Clear Exported Accounts":
                 admin_clear_created_accounts(chat_id)
                 return
             if text == "🔙 Main Menu":
@@ -1714,7 +1736,7 @@ if __name__ == "__main__":
     load_all()
     logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
     auto_restore_from_channel()
-    threading.Thread(target=auto_backup_loop, daemon=True).start()   # ✅ অটো ব্যাকআপ চালু আছে
+    threading.Thread(target=auto_backup_loop, daemon=True).start()
     threading.Thread(target=handle_updates, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, threaded=True)
