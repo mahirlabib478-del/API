@@ -1321,31 +1321,39 @@ def process_username(chat_id, text):
     return True
 
 def process_twofa(chat_id, text):
-    """ইউজারের দেওয়া 2FA সিক্রেট কী থেকে অটো কোড জেনারেট করে"""
+    """ইউজারের দেওয়া 2FA সিক্রেট কী থেকে অটো কোড জেনারেট করে (স্পেস অটো-রিমুভ)"""
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "twofa":
         return False
     
+    # 🔥 স্পেস, নিউলাইন, ট্যাব সব সরিয়ে ফেলুন
     secret_key = text.strip()
+    secret_key = ''.join(secret_key.split())  # সব স্পেস, ট্যাব, নিউলাইন সরায়
     
-    # সিক্রেট কী ভ্যালিডেশন (Base32 ফরম্যাট)
+    # ভ্যালিডেশন
+    if not secret_key:
+        send_message("❌ **সিক্রেট কী খালি রাখা যাবে না।** দয়া করে সঠিক কী দিন।", chat_id)
+        return True
+    
     try:
         totp = pyotp.TOTP(secret_key)
         current_code = totp.now()
         logger.info(f"2FA code generated for user {chat_id}: {current_code}")
         
-        # সেশন আপডেট
-        session["twofa"] = secret_key          # সিক্রেট কী সংরক্ষণ
-        session["twofa_code"] = current_code   # জেনারেটেড কোড (যদি দরকার হয়)
+        session["twofa"] = secret_key
+        session["twofa_code"] = current_code
         
     except Exception as e:
-        send_message("❌ **ভুল 2FA সিক্রেট কী!** দয়া করে সঠিক Base32 ফরম্যাটের কী দিন।", chat_id)
+        send_message(
+            "❌ **ভুল 2FA সিক্রেট কী!** দয়া করে সঠিক Base32 ফরম্যাটের কী দিন।\n"
+            "উদাহরণ: `JBSWY3DPEHPK3PXP` (স্পেস থাকলে সরিয়ে নিন)।",
+            chat_id
+        )
         return True
     
     session["step"] = "follow"
     set_session(chat_id, session)
     
-    # সফল জেনারেশন
     send_message(
         t("twofa_verified", chat_id, code=current_code),
         chat_id, reply_markup=yes_no_keyboard(chat_id)
