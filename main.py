@@ -251,6 +251,7 @@ def t(key, user_id, **kwargs):
             "upload_approved_summary": "✅ **Approved List Processing Complete**\n\n✅ Approved: {approved}\n❌ Not Found: {not_found}\n⚠️ Already Processed: {already}",
             "upload_rejected_summary": "❌ **Rejected List Processing Complete**\n\n❌ Rejected: {rejected}\n❌ Not Found: {not_found}\n⚠️ Already Processed: {already}",
             "upload_no_usernames": "⚠️ No valid usernames found in the list.",
+            "clear_exported_success": "🗑️ **{count} exported records cleared successfully!**",
             "export_excel": "📥 **Export Excel**\n\nClick below to download all created accounts as Excel file.",
             "excel_exported": "✅ **Excel file exported!**",
         },
@@ -307,6 +308,7 @@ def t(key, user_id, **kwargs):
             "upload_approved_summary": "✅ **অ্যাপ্রুভড লিস্ট প্রসেসিং সম্পন্ন**\n\n✅ অ্যাপ্রুভড: {approved}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
             "upload_rejected_summary": "❌ **রিজেক্টেড লিস্ট প্রসেসিং সম্পন্ন**\n\n❌ রিজেক্টেড: {rejected}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
             "upload_no_usernames": "⚠️ তালিকায় কোনো বৈধ ইউজারনেম পাওয়া যায়নি।",
+            "clear_exported_success": "🗑️ **{count} টি এক্সপোর্ট করা রেকর্ড মুছে ফেলা হয়েছে!**",
             "export_excel": "📥 **এক্সেল এক্সপোর্ট**\n\nনিচের বাটনে ক্লিক করে সব অ্যাকাউন্টের Excel ফাইল ডাউনলোড করুন।",
             "excel_exported": "✅ **Excel ফাইল তৈরি হয়েছে!**",
         }
@@ -362,7 +364,7 @@ def admin_keyboard():
             ["📥 Restore", f"🔧 Maintenance {maint_status}"],
             ["📋 Pending Approvals", "📥 Export Excel"],
             ["📤 Upload Approved", "📤 Upload Rejected"],
-            ["🔙 Main Menu"]
+            ["🗑️ Clear Exported Accounts", "🔙 Main Menu"]   # 👈 নতুন বাটন
         ],
         "resize_keyboard": True
     }
@@ -1233,6 +1235,15 @@ def process_uploaded_list(chat_id, text_or_file_content):
     clear_session(chat_id)
     return True
 
+# ================== NEW: CLEAR EXPORTED ACCOUNTS ==================
+def admin_clear_created_accounts(chat_id):
+    """সব created_accounts (এক্সপোর্ট করা রেকর্ড) মুছে ফেলে"""
+    with data_lock:
+        count = len(created_accounts)
+        created_accounts.clear()
+        save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+    send_message(t("clear_exported_success", chat_id, count=count), chat_id, reply_markup=admin_keyboard())
+
 # ================== USER COMMANDS ==================
 def start_command(chat_id, chat_type="private"):
     if chat_id not in subscribed_users:
@@ -1417,7 +1428,7 @@ def handle_updates():
                     process_update(update)
         except Exception as e:
             logger.error(f"Update loop error: {e}")
-        time.sleep(1)
+        time.sleep(0.1)   # 🔥 স্পিড বাড়ানোর জন্য ১ সেকেন্ড থেকে ০.১ সেকেন্ড করা হলো
 
 def process_update(update):
     if "message" in update:
@@ -1555,6 +1566,9 @@ def process_update(update):
                 return
             if text == "📤 Upload Rejected":
                 admin_upload_rejected_prompt(chat_id)
+                return
+            if text == "🗑️ Clear Exported Accounts":   # 👈 নতুন বাটন হ্যান্ডলার
+                admin_clear_created_accounts(chat_id)
                 return
             if text == "🔙 Main Menu":
                 send_message("Main Menu", chat_id, reply_markup=main_keyboard(chat_id))
@@ -1695,8 +1709,7 @@ if __name__ == "__main__":
     load_all()
     logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
     auto_restore_from_channel()
-    # threading.Thread(target=auto_backup_loop, daemon=True).start()   # অটো ব্যাকআপ বন্ধ
-    threading.Thread(target=auto_backup_loop, daemon=True).start()
+    threading.Thread(target=auto_backup_loop, daemon=True).start()   # ✅ অটো ব্যাকআপ চালু আছে
     threading.Thread(target=handle_updates, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, threaded=True)
