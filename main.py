@@ -1351,7 +1351,7 @@ def process_twofa(chat_id, text):
         chat_id, reply_markup=yes_no_keyboard(chat_id)
     )
     return True
-
+    
 def process_follow_yes(chat_id):
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "follow":
