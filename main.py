@@ -1695,6 +1695,7 @@ if __name__ == "__main__":
     load_all()
     logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
     auto_restore_from_channel()
+    # threading.Thread(target=auto_backup_loop, daemon=True).start()   # অটো ব্যাকআপ বন্ধ
     threading.Thread(target=auto_backup_loop, daemon=True).start()
     threading.Thread(target=handle_updates, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
