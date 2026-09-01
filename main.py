@@ -13,7 +13,7 @@ from openpyxl.styles import Font, Alignment
 from io import BytesIO
 
 # ================== CONFIGURATION ==================
-BOT_TOKEN = "8692984075:AAEpPTKdqD5dgGGBfYYpLPPyi26U93qVnzI"
+BOT_TOKEN = "8692984075:AAG5Ao63Mq3q1AeReiKc_G3-HD_plZ0NvJg"
 ADMIN_CHAT_ID = "8538304896"
 CHANNEL_ID = "-1003903695158"
 
@@ -1421,14 +1421,18 @@ def handle_updates():
             params = {"timeout": 30, "allowed_updates": ["message", "callback_query"]}
             if last_update_id:
                 params["offset"] = last_update_id + 1
-            resp = requests.get(url, params=params, timeout=15).json()   # timeout 15
+            # কানেকশন টাইমআউট ৫ সেকেন্ড, রিড টাইমআউট ৩০ সেকেন্ড
+            resp = requests.get(url, params=params, timeout=(5, 30)).json()
             if resp.get("ok") and resp.get("result"):
                 for update in resp["result"]:
                     last_update_id = update["update_id"]
                     process_update(update)
+        except requests.exceptions.Timeout:
+            # টাইমআউট হলে কোনো কিছু করবেন না – শুধু লুপ চালিয়ে যান
+            logger.warning("getUpdates timeout, retrying...")
         except Exception as e:
             logger.error(f"Update loop error: {e}")
-        time.sleep(0.02)   # 0.02 সেকেন্ড
+        time.sleep(0.02)   # খুব কম স্লিপ, যাতে দ্রুত পুনরায় চেষ্টা করে
 
 def process_update(update):
     if "message" in update:
