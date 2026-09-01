@@ -117,7 +117,7 @@ def save_all():
     save_json(CONFIG_FILE, config)
     save_json(USER_BALANCES_FILE, user_balances)
     save_json(USER_INFO_FILE, user_info)
-    save_json(LANGUAGE_FILE, user_language)
+    save_json(LANGUAGE_FILE, user_language)    
     trigger_backup()
 
 # ================== DEBOUNCED BACKUP ==================
@@ -892,7 +892,7 @@ def auto_restore_from_channel():
 
 def auto_backup_loop():
     while True:
-        time.sleep(300)
+        time.sleep(86400)
         save_data_to_channel()
 
 # ================== ADMIN FUNCTIONS ==================
