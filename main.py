@@ -1321,32 +1321,35 @@ def process_username(chat_id, text):
     return True
 
 def process_twofa(chat_id, text):
-    """ইউজারের দেওয়া 2FA সিক্রেট কী থেকে অটো কোড জেনারেট করে (স্পেস অটো-রিমুভ)"""
+    """স্পেস সহ কী নেয়, ভেরিফাইয়ের জন্য স্পেস সরায়, কিন্তু আসল টেক্সট সেভ করে"""
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "twofa":
         return False
     
-    # 🔥 স্পেস, নিউলাইন, ট্যাব সব সরিয়ে ফেলুন
-    secret_key = text.strip()
-    secret_key = ''.join(secret_key.split())  # সব স্পেস, ট্যাব, নিউলাইন সরায়
+    # ১. ইউজারের দেওয়া আসল টেক্সট (স্পেস সহ) সংরক্ষণ করব
+    original_key = text.strip()
     
-    # ভ্যালিডেশন
-    if not secret_key:
+    # ২. ভেরিফাইয়ের জন্য স্পেস, ট্যাব, নিউলাইন সরাই
+    clean_key = ''.join(original_key.split())
+    
+    if not clean_key:
         send_message("❌ **সিক্রেট কী খালি রাখা যাবে না।** দয়া করে সঠিক কী দিন।", chat_id)
         return True
     
     try:
-        totp = pyotp.TOTP(secret_key)
+        # ক্লিন কী দিয়ে TOTP অবজেক্ট তৈরি
+        totp = pyotp.TOTP(clean_key)
         current_code = totp.now()
         logger.info(f"2FA code generated for user {chat_id}: {current_code}")
         
-        session["twofa"] = secret_key
-        session["twofa_code"] = current_code
+        # 🔥 সেশনেও আসল টেক্সট (স্পেস সহ) সংরক্ষণ করছি
+        session["twofa"] = original_key          # এক্সেলে যাবে স্পেস সহ
+        session["twofa_code"] = current_code     # জেনারেটেড কোড (যদি দরকার হয়)
         
     except Exception as e:
         send_message(
             "❌ **ভুল 2FA সিক্রেট কী!** দয়া করে সঠিক Base32 ফরম্যাটের কী দিন।\n"
-            "উদাহরণ: `JBSWY3DPEHPK3PXP` (স্পেস থাকলে সরিয়ে নিন)।",
+            "উদাহরণ: `JBSWY3DPEHPK3PXP` (স্পেস থাকলেও চলবে, বট নিজেই ঠিক করবে)",
             chat_id
         )
         return True
