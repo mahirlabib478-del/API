@@ -118,7 +118,7 @@ def save_all():
     save_json(USER_BALANCES_FILE, user_balances)
     save_json(USER_INFO_FILE, user_info)
     save_json(LANGUAGE_FILE, user_language)    
-    trigger_backup()
+    
 
 # ================== DEBOUNCED BACKUP ==================
 def trigger_backup():
@@ -145,7 +145,7 @@ def send_message(text, chat_id, reply_markup=None, parse_mode="Markdown"):
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
-        return requests.post(url, json=payload, timeout=10)
+        return requests.post(url, json=payload, timeout=3)
     except Exception as e:
         logger.error(f"Send error: {e}")
         return None
@@ -1421,14 +1421,14 @@ def handle_updates():
             params = {"timeout": 30, "allowed_updates": ["message", "callback_query"]}
             if last_update_id:
                 params["offset"] = last_update_id + 1
-            resp = requests.get(url, params=params, timeout=35).json()
+            resp = requests.get(url, params=params, timeout=15).json()   # timeout 15
             if resp.get("ok") and resp.get("result"):
                 for update in resp["result"]:
                     last_update_id = update["update_id"]
                     process_update(update)
         except Exception as e:
             logger.error(f"Update loop error: {e}")
-        time.sleep(0.1)   # 🔥 স্পিড বাড়ানোর জন্য ১ সেকেন্ড থেকে ০.১ সেকেন্ড করা হলো
+        time.sleep(0.02)   # 0.02 সেকেন্ড
 
 def process_update(update):
     if "message" in update:
