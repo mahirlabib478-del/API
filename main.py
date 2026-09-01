@@ -14,7 +14,7 @@ from io import BytesIO
 
 # ================== CONFIGURATION ==================
 BOT_TOKEN = "8692984075:AAG5Ao63Mq3q1AeReiKc_G3-HD_plZ0NvJg"
-ADMIN_CHAT_ID = "8538304896"
+ADMIN_CHAT_ID = "2035024902"
 CHANNEL_ID = "-1003903695158"
 
 # ================== LOGGING ==================
