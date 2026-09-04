@@ -45,6 +45,7 @@ config = {
     "base_balance": 10.0,
     "channel_id": CHANNEL_ID,
     "maintenance_mode": False,
+    "bot_version": "0",   # auto-generated on start
     "work_rules_en": "📱 **Instagram Account Opening Guidelines**\n\n"
                      "1️⃣ You will receive an email and password.\n"
                      "2️⃣ Enter your Instagram username.\n"
@@ -267,7 +268,7 @@ def t(key, user_id, **kwargs):
             "no_my_accounts": "📭 You haven't created any accounts yet.",
             "support_message": "📞 **Support**\n\nFor any help, contact:\n@mahirlabib45",
             "user_list": "👥 **User List** (Page {page}/{total_pages})\n\n",
-            "user_list_item": "🆔 `{id}`\n💰 Balance: {balance:.2f} BDT\n📦 Accounts: {total}\nStatus: {status}\n\n",
+            "user_list_item": "🆔 `{id}`\n👤 Username: @{username}\n💰 Balance: {balance:.2f} BDT\n📦 Accounts: {total}\nStatus: {status}\n\n",
             "no_users": "No users found.",
             "banned_list": "🚫 **Banned Users** (Page {page}/{total_pages})\n\n",
             "banned_user_item": "🆔 `{id}`\n⏳ Ban Remaining: {ban_time}\n\n",
@@ -342,7 +343,7 @@ def t(key, user_id, **kwargs):
             "no_my_accounts": "📭 আপনি এখনো কোনো অ্যাকাউন্ট খোলেননি।",
             "support_message": "📞 **সাপোর্ট**\n\nসাহায্যের জন্য যোগাযোগ করুন:\n@mahirlabib45",
             "user_list": "👥 **ইউজার লিস্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
-            "user_list_item": "🆔 `{id}`\n💰 ব্যালেন্স: {balance:.2f} টাকা\n📦 অ্যাকাউন্ট: {total}\nস্ট্যাটাস: {status}\n\n",
+            "user_list_item": "🆔 `{id}`\n👤 ইউজারনেম: @{username}\n💰 ব্যালেন্স: {balance:.2f} টাকা\n📦 অ্যাকাউন্ট: {total}\nস্ট্যাটাস: {status}\n\n",
             "no_users": "কোনো ইউজার পাওয়া যায়নি।",
             "banned_list": "🚫 **ব্যানড ইউজার** (পৃষ্ঠা {page}/{total_pages})\n\n",
             "banned_user_item": "🆔 `{id}`\n⏳ ব্যান বাকি: {ban_time}\n\n",
@@ -995,6 +996,22 @@ def auto_backup_loop():
         time.sleep(86400)
         save_data_to_channel()
 
+# ================== VERSION MANAGEMENT ==================
+def generate_new_version():
+    """Bot start/restart হলে new version তৈরি হবে"""
+    return datetime.now().strftime("%Y%m%d%H%M%S%f")
+
+def check_and_update_version():
+    """Bot start হলে version auto-change করবে, সব ইউজারকে /start দিতে বাধ্য করবে"""
+    current_version = config.get("bot_version", "0")
+    new_version = generate_new_version()
+    if current_version != new_version:
+        config["bot_version"] = new_version
+        save_json(CONFIG_FILE, config)
+        logger.info(f"Bot version updated to: {new_version}")
+    else:
+        logger.info("Version already up-to-date.")
+
 # ================== ADMIN FUNCTIONS ==================
 def admin_panel(chat_id):
     send_message(t("admin_panel", chat_id), chat_id, reply_markup=admin_keyboard())
@@ -1399,10 +1416,12 @@ def admin_show_user_list(chat_id, page=0, message_id=None):
     for uid in page_users:
         balance = user_balances.get(str(uid), 0.0)
         total_acc = user_info.get(str(uid), {}).get("total_accounts", 0)
+        uname = user_info.get(str(uid), {}).get("username", "N/A")
         banned, _ = is_banned(uid)
         ban_status = "🔴 Banned" if banned else "🟢 Active"
         lines.append(t("user_list_item", chat_id,
                        id=uid,
+                       username=uname,
                        balance=balance,
                        total=total_acc,
                        status=ban_status))
@@ -1475,14 +1494,24 @@ def admin_broadcast_prompt(chat_id):
     send_message(t("broadcast_prompt", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
 
 # ================== USER COMMANDS ==================
-def start_command(chat_id, chat_type="private"):
+def start_command(chat_id, chat_type="private", username=None):
     if chat_id not in subscribed_users:
         with data_lock:
             subscribed_users.add(chat_id)
             save_all()
     uid = str(chat_id)
     if uid not in user_info:
-        user_info[uid] = {"name": f"User_{chat_id}", "total_accounts": 0}
+        user_info[uid] = {
+            "name": f"User_{chat_id}",
+            "total_accounts": 0,
+            "username": username or "N/A",
+            "last_version": config.get("bot_version", "0")
+        }
+        save_json(USER_INFO_FILE, user_info)
+    else:
+        if username and user_info[uid].get("username", "N/A") == "N/A":
+            user_info[uid]["username"] = username
+        user_info[uid]["last_version"] = config.get("bot_version", "0")
         save_json(USER_INFO_FILE, user_info)
     if uid not in user_language:
         user_language[uid] = "en"
@@ -1715,17 +1744,43 @@ def process_update(update):
         chat_type = msg["chat"]["type"]
         text = msg.get("text", "").strip()
 
+        # নতুন ইউজার হলে সাবস্ক্রাইব করুন
+        if chat_id not in subscribed_users:
+            with data_lock:
+                subscribed_users.add(chat_id)
+                save_all()
+
+        # ===== ভার্সন চেক (সব ইউজারের জন্য) =====
+        uid = str(chat_id)
+        if uid in user_info:
+            user_version = user_info[uid].get("last_version", "0")
+            current_version = config.get("bot_version", "0")
+            if user_version != current_version and text != "/start":
+                lang = get_lang(chat_id)
+                msg_text = (
+                    "🔄 **Bot updated!** Please press /start to continue."
+                    if lang == "en" else
+                    "🔄 **বট আপডেট হয়েছে!** চালিয়ে যেতে /start চাপুন।"
+                )
+                send_message(msg_text, chat_id)
+                return
+        # ===== ভার্সন চেক শেষ =====
+
         if text == "/start":
-            start_command(chat_id, chat_type)
+            uname = msg.get("from", {}).get("username")
+            start_command(chat_id, chat_type, username=uname)
             return
 
         if chat_type != "private":
             return
 
-        if chat_id not in subscribed_users:
-            with data_lock:
-                subscribed_users.add(chat_id)
-                save_all()
+        # ইউজারনেম আপডেট (সব মেসেজে)
+        if "from" in msg and "username" in msg["from"]:
+            uname = msg["from"]["username"]
+            uid = str(chat_id)
+            if uid in user_info:
+                user_info[uid]["username"] = uname
+                save_json(USER_INFO_FILE, user_info)
 
         # ===== ADMIN SECTION =====
         if chat_id == ADMIN_CHAT_ID:
@@ -1791,7 +1846,6 @@ def process_update(update):
                     clear_session(chat_id)
                     send_message(t("broadcast_cancelled", chat_id), chat_id, reply_markup=admin_keyboard())
                     return
-                # Send broadcast to all users
                 for uid in list(subscribed_users):
                     try:
                         send_message(text, uid)
@@ -2066,8 +2120,9 @@ def home():
 # ================== MAIN ==================
 if __name__ == "__main__":
     load_all()
-    logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
     auto_restore_from_channel()
+    check_and_update_version()
+    logger.info(f"Loaded: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
     threading.Thread(target=auto_backup_loop, daemon=True).start()
     threading.Thread(target=handle_updates, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
