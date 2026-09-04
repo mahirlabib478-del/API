@@ -1736,6 +1736,38 @@ def handle_updates():
         except Exception as e:
             logger.error(f"Update loop error: {e}")
         time.sleep(0.02)
+        
+def get_user_id_from_identifier(identifier):
+    """
+    identifier হতে পারে user_id (সাংখ্যিক) অথবা @username।
+    রিটার্ন: user_id (str) অথবা None
+    """
+    identifier = identifier.strip()
+    if identifier.isdigit():
+        return identifier
+    if identifier.startswith("@"):
+        uname = identifier[1:]  # @ সরান
+        # user_info-তে username খুঁজুন
+        for uid, info in user_info.items():
+            if info.get("username", "").lower() == uname.lower():
+                return uid
+    return None        
+
+def get_user_id_from_identifier(identifier):
+    """
+    identifier হতে পারে user_id (সাংখ্যিক) অথবা @username।
+    রিটার্ন: user_id (str) অথবা None
+    """
+    identifier = identifier.strip()
+    if identifier.isdigit():
+        return identifier
+    if identifier.startswith("@"):
+        uname = identifier[1:]  # @ সরান
+        # user_info-তে username খুঁজুন
+        for uid, info in user_info.items():
+            if info.get("username", "").lower() == uname.lower():
+                return uid
+    return None
 
 def process_update(update):
     if "message" in update:
@@ -1948,18 +1980,47 @@ def process_update(update):
                 if len(parts) == 2:
                     admin_reject_withdraw(chat_id, parts[1])
                 return
-            if text.startswith("/unban"):
-                parts = text.split()
+
+            # ===== নতুন /ban এবং /unban হ্যান্ডলার =====
+            if text.startswith("/ban"):
+                parts = text.split(maxsplit=1)
                 if len(parts) == 2:
-                    try:
-                        target_id = int(parts[1])
-                        unban_user(target_id)
-                        send_message(t("unbanned_user", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
-                    except:
-                        send_message("❌ Invalid user ID.", chat_id)
+                    identifier = parts[1]
+                    target_id = get_user_id_from_identifier(identifier)
+                    if target_id:
+                        if target_id == str(ADMIN_CHAT_ID):
+                            send_message("❌ You cannot ban yourself.", chat_id)
+                            return
+                        manual_ban_user(target_id)
+                        send_message(t("ban_success", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
+                        try:
+                            send_message("You have been banned by admin.", target_id)
+                        except:
+                            pass
+                    else:
+                        send_message("❌ User not found. Provide a valid user ID or @username.", chat_id)
                 else:
-                    send_message("Usage: /unban <user_id>", chat_id)
+                    send_message("Usage: /ban <user_id or @username>", chat_id)
                 return
+
+            if text.startswith("/unban"):
+                parts = text.split(maxsplit=1)
+                if len(parts) == 2:
+                    identifier = parts[1]
+                    target_id = get_user_id_from_identifier(identifier)
+                    if target_id:
+                        unban_user(target_id)
+                        send_message(t("unban_success", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
+                        try:
+                            send_message("You have been unbanned by admin.", target_id)
+                        except:
+                            pass
+                    else:
+                        send_message("❌ User not found. Provide a valid user ID or @username.", chat_id)
+                else:
+                    send_message("Usage: /unban <user_id or @username>", chat_id)
+                return
+            # ===== /ban ও /unban হ্যান্ডলার শেষ =====
 
         # ===== USER SECTION =====
         session = get_session(chat_id)
@@ -2111,7 +2172,7 @@ def process_update(update):
                 pass
             delete_message(chat_id, message_id)
             admin_show_banned_users(chat_id)
-
+            
 # ================== FLASK ==================
 @app.route("/")
 def home():
