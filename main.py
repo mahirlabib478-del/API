@@ -6,7 +6,7 @@ import threading
 import uuid
 import gzip
 import requests
-import pyotp  # ✅ নতুন যোগ
+import pyotp
 from flask import Flask
 from datetime import datetime
 import openpyxl
@@ -32,6 +32,7 @@ USER_BALANCES_FILE = "user_balances.json"
 USER_INFO_FILE = "user_info.json"
 LANGUAGE_FILE = "language.json"
 CREATED_ACCOUNTS_FILE = "created_accounts.json"
+CANCEL_TRACKING_FILE = "cancel_tracking.json"  # নতুন
 
 # ================== GLOBALS ==================
 subscribed_users = set()
@@ -39,6 +40,7 @@ user_sessions = {}
 credentials = []
 withdraw_requests = []
 created_accounts = []  # status: pending/approved/rejected
+cancel_tracking = {}   # নতুন: cancel ট্র্যাকিং
 config = {
     "base_balance": 10.0,
     "channel_id": CHANNEL_ID,
@@ -49,8 +51,8 @@ config = {
                      "3️⃣ Enter 2FA code if required.\n"
                      "4️⃣ Follow 5 profiles and set profile picture.\n"
                      "5️⃣ Upon completion, your account will be sent for admin approval.",
-    "work_rules_bn": "📱 **Instagram অ্যাকাউন্ট খোলার নিয়মাবলী**\n\n"
-                     "1️⃣ আপনি একটি ইমেইল ও পাসওয়ার্ড পাবেন।\n"
+    "work_rules_bn": "📱 **Instagram অ্যাকাউন্ট খোলার নিয়মাবলী**\n\n"
+                     "1️⃣ আপনি একটি ইমেইল ও পাসওয়ার্ড পাবেন।\n"
                      "2️⃣ আপনার Instagram ইউজারনেম দিন।\n"
                      "3️⃣ 2FA কোড দিন (যদি থাকে)।\n"
                      "4️⃣ ৫টি প্রোফাইল ফলো করুন ও প্রোফাইল পিক সেট করুন।\n"
@@ -87,7 +89,7 @@ def save_json(filename, data):
             logger.error(f"Save failed {filename}: {e}")
 
 def load_all():
-    global subscribed_users, user_sessions, credentials, withdraw_requests, config, user_balances, user_info, user_language, created_accounts
+    global subscribed_users, user_sessions, credentials, withdraw_requests, config, user_balances, user_info, user_language, created_accounts, cancel_tracking
     subscribed_users = set(load_json(USERS_FILE, []))
     user_sessions = load_json(SESSIONS_FILE, {})
     credentials = load_json(CREDENTIALS_FILE, [])
@@ -98,13 +100,14 @@ def load_all():
     user_balances = load_json(USER_BALANCES_FILE, {})
     user_info = load_json(USER_INFO_FILE, {})
     user_language = load_json(LANGUAGE_FILE, {})
-    
+    cancel_tracking = load_json(CANCEL_TRACKING_FILE, {})  # নতুন
+
     cfg = load_json(CONFIG_FILE, {})
     for k in config:
         if k not in cfg:
             cfg[k] = config[k]
     config = cfg
-    
+
     if not config.get("channel_id"):
         config["channel_id"] = CHANNEL_ID
         save_json(CONFIG_FILE, config)
@@ -118,7 +121,8 @@ def save_all():
     save_json(CONFIG_FILE, config)
     save_json(USER_BALANCES_FILE, user_balances)
     save_json(USER_INFO_FILE, user_info)
-    save_json(LANGUAGE_FILE, user_language)    
+    save_json(LANGUAGE_FILE, user_language)
+    save_json(CANCEL_TRACKING_FILE, cancel_tracking)      # নতুন
     trigger_backup()
 
 # ================== DEBOUNCED BACKUP ==================
@@ -255,6 +259,8 @@ def t(key, user_id, **kwargs):
             "clear_exported_success": "🗑️ **{count} exported records cleared successfully!**",
             "export_excel": "📥 **Export Excel**\n\nClick below to download all created accounts as Excel file.",
             "excel_exported": "✅ **Excel file exported!**",
+            "banned_work": "⛔ You are temporarily banned from Instagram work for {hours}h {minutes}m. Please try again later.",  # নতুন
+            "unbanned_user": "✅ User {user_id} has been unbanned.",  # নতুন
         },
         "bn": {
             "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
@@ -262,56 +268,58 @@ def t(key, user_id, **kwargs):
             "withdraw": "💸 **উইথড্র করুন**\n\nআপনার টাকা উত্তোলনের মাধ্যম নির্বাচন করুন:",
             "enter_account": "📞 আপনার {method} অ্যাকাউন্ট নম্বর দিন:",
             "enter_amount": "💰 **কত টাকা উইথড্র করতে চান?**",
-            "withdraw_submitted": "✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n🆔 **আইডি:** `{w_id}`\n💰 **পরিমাণ:** {amount} টাকা\n📌 স্ট্যাটাস: ⏳ পেন্ডিং",
+            "withdraw_submitted": "✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n🆔 **আইডি:** `{w_id}`\n💰 **পরিমাণ:** {amount} টাকা\n📌 স্ট্যাটাস: ⏳ পেন্ডিং",
             "insufficient": "❌ **অপর্যাপ্ত ব্যালেন্স!**",
             "invalid_amount": "❌ **সঠিক টাকার পরিমাণ দিন।**",
-            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\nনিচের বাটনে ক্লিক করে আপনার **Instagram ইউজারনেম** দিন:",
+            "account_assigned": "✅ **আপনার জন্য একটি অ্যাকাউন্ট বরাদ্দ করা হয়েছে:**\n\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n\nনিচের বাটনে ক্লিক করে আপনার **Instagram ইউজারনেম** দিন:",
             "enter_username_prompt": "👤 **আপনার প্রকৃত Instagram ইউজারনেম দিন:**",
             "twofa_prompt": "🔐 **আপনার 2FA সিক্রেট কী দিন:**\n(যেমন: JBSWY3DPEHPK3PXP)\nবট নিজেই কোড জেনারেট করবে।",
-            "twofa_verified": "✅ **2FA কোড অটো-জেনারেট করা হয়েছে!**\n🔐 কোড: `{code}`\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
-            "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
-            "completed": "🎉 **অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n👤 **ইউজারনেম:** `{username}`\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA সিক্রেট:** {twofa}\n\n⏳ **আপনার অ্যাকাউন্টটি এখন অ্যাডমিন অনুমোদনের অপেক্ষায়। অনুমোদন পেলে ব্যালেন্স যোগ হবে।**",
+            "twofa_verified": "✅ **2FA কোড অটো-জেনারেট করা হয়েছে!**\n🔐 কোড: `{code}`\n\nএখন **৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট** করুন। সম্পন্ন করেছেন?",
+            "follow_yes": "⚠️ **দয়া করে ৫টি প্রোফাইল ফলো ও প্রোফাইল পিক সেট করুন** এবং তারপর **হ্যাঁ** বাটন চাপুন।",
+            "completed": "🎉 **অ্যাকাউন্ট খোলা সম্পন্ন হয়েছে!**\n\n👤 **ইউজারনেম:** `{username}`\n📧 **ইমেইল:** `{email}`\n🔑 **পাসওয়ার্ড:** `{password}`\n🔐 **2FA সিক্রেট:** {twofa}\n\n⏳ **আপনার অ্যাকাউন্টটি এখন অ্যাডমিন অনুমোদনের অপেক্ষায়। অনুমোদন পেলে ব্যালেন্স যোগ হবে।**",
             "no_accounts": "❌ **কোনো অব্যবহৃত অ্যাকাউন্ট নেই!** অ্যাডমিনের সাথে যোগাযোগ করুন।",
             "active_session": "⏳ **আপনার একটি চলমান সেশন আছে।** আগে সেটি শেষ করুন বা বাতিল করুন।",
-            "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
-            "cancelled": "❌ বাতিল করা হয়েছে।",
-            "unknown": "❌ আমি বুঝতে পারিনি। দয়া করে নিচের বাটন ব্যবহার করুন।",
+            "under_maintenance": "🔧 **বট রক্ষণাবেক্ষণে রয়েছে। পরে চেষ্টা করুন।**",
+            "cancelled": "❌ বাতিল করা হয়েছে।",
+            "unknown": "❌ আমি বুঝতে পারিনি। দয়া করে নিচের বাটন ব্যবহার করুন।",
             "work": "📱 **Instagram Work**\n\n{rules}\n\n👇 **Start** বাটনে ক্লিক করুন।",
-            "language_changed": "🌐 ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
+            "language_changed": "🌐 ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
             "admin_panel": "⚙️ **অ্যাডমিন কন্ট্রোল প্যানেল**",
             "add_accounts": "📧 **ইমেইল লিস্ট দিন**\n\nপ্রতি লাইনে একটি:\n`user1@gmail.com`\n`user2@yahoo.com`\n\nবাতিল করতে /cancel লিখুন।",
-            "add_accounts_success": "✅ **{added} টি অ্যাকাউন্ট যোগ করা হয়েছে।** মোট: {total}",
-            "no_valid_emails": "❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**",
-            "enter_password": "🔑 **পাসওয়ার্ড দিন** (সব অ্যাকাউন্টের জন্য একই):",
-            "password_empty": "❌ **পাসওয়ার্ড খালি রাখা যাবে না।**",
+            "add_accounts_success": "✅ **{added} টি অ্যাকাউন্ট যোগ করা হয়েছে।** মোট: {total}",
+            "no_valid_emails": "❌ **কোনো বৈধ ইমেইল পাওয়া যায়নি।**",
+            "enter_password": "🔑 **পাসওয়ার্ড দিন** (সব অ্যাকাউন্টের জন্য একই):",
+            "password_empty": "❌ **পাসওয়ার্ড খালি রাখা যাবে না।**",
             "account_list": "📋 **অ্যাকাউন্ট লিস্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
             "account_item": "`{email}` | `{password}` | {status}",
-            "deleted_all": "🗑️ **{count} টি অ্যাকাউন্ট ডিলিট করা হয়েছে।**",
-            "stats": "📊 **পরিসংখ্যান**\n\n👥 ইউজার: {users}\n📦 ক্রেডেনশিয়াল: {total} (ব্যবহৃত: {used})\n💸 পেন্ডিং উইথড্র: {pending}\n💰 প্রতি অ্যাকাউন্ট মূল্য: {price} টাকা\n⏳ পেন্ডিং অ্যাপ্রুভাল: {pending_acc}",
+            "deleted_all": "🗑️ **{count} টি অ্যাকাউন্ট ডিলিট করা হয়েছে।**",
+            "stats": "📊 **পরিসংখ্যান**\n\n👥 ইউজার: {users}\n📦 ক্রেডেনশিয়াল: {total} (ব্যবহৃত: {used})\n💸 পেন্ডিং উইথড্র: {pending}\n💰 প্রতি অ্যাকাউন্ট মূল্য: {price} টাকা\n⏳ পেন্ডিং অ্যাপ্রুভাল: {pending_acc}",
             "no_pending": "📭 **কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই।**",
             "pending_withdraws": "📥 **পেন্ডিং উইথড্র রিকোয়েস্ট**\n\n",
-            "pending_item": "🆔 `{id}`\n👤 ইউজার: `{user}`\n💰 পরিমাণ: `{amount}` টাকা\n💳 মাধ্যম: {method}\n📞 অ্যাকাউন্ট: `{account}`\n🕒 সময়: {time}\n",
-            "approve_success": "✅ **উইথড্র {w_id} অনুমোদিত হয়েছে।**",
-            "reject_success": "❌ **উইথড্র {w_id} বাতিল করা হয়েছে।**",
-            "not_found": "❌ {w_id} পাওয়া যায়নি।",
-            "price_set": "✅ প্রতি অ্যাকাউন্ট খোলার ইনকাম **{price}** টাকা সেট করা হয়েছে।",
-            "rules_updated": "✅ **নিয়মাবলী আপডেট করা হয়েছে।**",
-            "channel_set": "✅ চ্যানেল আইডি `{channel}` সেট করা হয়েছে।",
-            "backup_created": "✅ **ব্যাকআপ তৈরি হয়েছে!**",
+            "pending_item": "🆔 `{id}`\n👤 ইউজার: `{user}`\n💰 পরিমাণ: `{amount}` টাকা\n💳 মাধ্যম: {method}\n📞 অ্যাকাউন্ট: `{account}`\n🕒 সময়: {time}\n",
+            "approve_success": "✅ **উইথড্র {w_id} অনুমোদিত হয়েছে।**",
+            "reject_success": "❌ **উইথড্র {w_id} বাতিল করা হয়েছে।**",
+            "not_found": "❌ {w_id} পাওয়া যায়নি।",
+            "price_set": "✅ প্রতি অ্যাকাউন্ট খোলার ইনকাম **{price}** টাকা সেট করা হয়েছে।",
+            "rules_updated": "✅ **নিয়মাবলী আপডেট করা হয়েছে।**",
+            "channel_set": "✅ চ্যানেল আইডি `{channel}` সেট করা হয়েছে।",
+            "backup_created": "✅ **ব্যাকআপ তৈরি হয়েছে!**",
             "restore_completed": "✅ **রিস্টোর সম্পন্ন!**",
-            "backup_creating": "⏳ **ব্যাকআপ নেওয়া হচ্ছে...**",
+            "backup_creating": "⏳ **ব্যাকআপ নেওয়া হচ্ছে...**",
             "restoring": "⏳ **ডেটা রিস্টোর করা হচ্ছে...**",
             "pending_approvals_list": "⏳ **পেন্ডিং অ্যাপ্রুভাল** (পৃষ্ঠা {page}/{total_pages})\n\n",
             "pending_approval_item": "🆔 `{id}` | 👤 ইউজার: `{user}` | 👤 ইউজারনেম: `{username}` | 📧 {email} | 🕒 {time}\n",
             "no_pending_approvals": "📭 **কোনো পেন্ডিং অ্যাপ্রুভাল নেই।**",
             "upload_approved_prompt": "📤 **অ্যাপ্রুভড লিস্ট আপলোড**\n\nএকটি টেক্সট ফাইল (.txt) আপলোড করুন অথবা ইউজারনেমের তালিকা টাইপ করুন (প্রতি লাইনে একটি) যাদের অ্যাপ্রুভ করতে চান।\nবাতিল করতে /cancel লিখুন।",
             "upload_rejected_prompt": "📤 **রিজেক্টেড লিস্ট আপলোড**\n\nএকটি টেক্সট ফাইল (.txt) আপলোড করুন অথবা ইউজারনেমের তালিকা টাইপ করুন (প্রতি লাইনে একটি) যাদের রিজেক্ট করতে চান।\nবাতিল করতে /cancel লিখুন।",
-            "upload_approved_summary": "✅ **অ্যাপ্রুভড লিস্ট প্রসেসিং সম্পন্ন**\n\n✅ অ্যাপ্রুভড: {approved}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
-            "upload_rejected_summary": "❌ **রিজেক্টেড লিস্ট প্রসেসিং সম্পন্ন**\n\n❌ রিজেক্টেড: {rejected}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
-            "upload_no_usernames": "⚠️ তালিকায় কোনো বৈধ ইউজারনেম পাওয়া যায়নি।",
-            "clear_exported_success": "🗑️ **{count} টি এক্সপোর্ট করা রেকর্ড মুছে ফেলা হয়েছে!**",
+            "upload_approved_summary": "✅ **অ্যাপ্রুভড লিস্ট প্রসেসিং সম্পন্ন**\n\n✅ অ্যাপ্রুভড: {approved}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
+            "upload_rejected_summary": "❌ **রিজেক্টেড লিস্ট প্রসেসিং সম্পন্ন**\n\n❌ রিজেক্টেড: {rejected}\n❌ পাওয়া যায়নি: {not_found}\n⚠️ ইতিমধ্যে প্রসেসড: {already}",
+            "upload_no_usernames": "⚠️ তালিকায় কোনো বৈধ ইউজারনেম পাওয়া যায়নি।",
+            "clear_exported_success": "🗑️ **{count} টি এক্সপোর্ট করা রেকর্ড মুছে ফেলা হয়েছে!**",
             "export_excel": "📥 **এক্সেল এক্সপোর্ট**\n\nনিচের বাটনে ক্লিক করে সব অ্যাকাউন্টের Excel ফাইল ডাউনলোড করুন।",
-            "excel_exported": "✅ **Excel ফাইল তৈরি হয়েছে!**",
+            "excel_exported": "✅ **Excel ফাইল তৈরি হয়েছে!**",
+            "banned_work": "⛔ আপনি Instagram কাজ থেকে {hours} ঘণ্টা {minutes} মিনিটের জন্য ব্যান হয়েছেন। পরে আবার চেষ্টা করুন।",  # নতুন
+            "unbanned_user": "✅ ইউজার {user_id} কে আনব্যান করা হয়েছে।",  # নতুন
         }
     }
     text = translations.get(lang, translations["en"]).get(key, key)
@@ -342,6 +350,49 @@ def get_balance_text(user_id):
     balance = user_balances.get(uid, 0.0)
     total_accounts = user_info.get(uid, {}).get("total_accounts", 0)
     return t("balance", user_id, balance=balance, total=total_accounts)
+
+# ================== BAN HELPERS (নতুন) ==================
+def record_cancel(user_id):
+    uid = str(user_id)
+    now = time.time()
+    with data_lock:
+        ct = cancel_tracking.setdefault(uid, {"consecutive": 0, "timestamps": [], "ban_end": 0})
+        ct["consecutive"] += 1
+        ct["timestamps"].append(now)
+        # শুধু গত ২৪ ঘণ্টার টাইমস্ট্যাম্প রাখা
+        ct["timestamps"] = [t for t in ct["timestamps"] if now - t <= 86400]
+        # ব্যান শর্ত চেক
+        if ct["consecutive"] >= 3 or len(ct["timestamps"]) >= 5:
+            ct["ban_end"] = now + 86400
+            ct["consecutive"] = 0   # নতুন চক্রের জন্য রিসেট
+        save_json(CANCEL_TRACKING_FILE, cancel_tracking)
+
+def reset_consecutive_cancels(user_id):
+    uid = str(user_id)
+    with data_lock:
+        if uid in cancel_tracking:
+            cancel_tracking[uid]["consecutive"] = 0
+            save_json(CANCEL_TRACKING_FILE, cancel_tracking)
+
+def is_banned(user_id):
+    ct = cancel_tracking.get(str(user_id))
+    if ct and ct.get("ban_end", 0) > time.time():
+        return True, ct["ban_end"]
+    return False, 0
+
+def get_ban_remaining(user_id):
+    ct = cancel_tracking.get(str(user_id))
+    if ct and ct.get("ban_end", 0) > time.time():
+        return int(ct["ban_end"] - time.time())
+    return 0
+
+def unban_user(user_id):
+    uid = str(user_id)
+    with data_lock:
+        if uid in cancel_tracking:
+            cancel_tracking[uid]["ban_end"] = 0
+            cancel_tracking[uid]["consecutive"] = 0
+            save_json(CANCEL_TRACKING_FILE, cancel_tracking)
 
 # ================== KEYBOARDS ==================
 def main_keyboard(chat_id):
@@ -521,7 +572,6 @@ def process_approve_list(usernames):
             username = username.strip()
             if not username:
                 continue
-            # find pending account with this username
             found = False
             for acc in created_accounts:
                 if acc.get("username") == username and acc.get("status") == "pending":
@@ -541,7 +591,6 @@ def process_approve_list(usernames):
                     found = True
                     break
             if not found:
-                # Check if already processed
                 already_exists = any(acc.get("username") == username and acc.get("status") != "pending" for acc in created_accounts)
                 if already_exists:
                     already += 1
@@ -667,6 +716,7 @@ def generate_backup_data():
             "user_balances": user_balances,
             "user_info": user_info,
             "user_language": user_language,
+            "cancel_tracking": cancel_tracking,  # ব্যাকআপে অন্তর্ভুক্ত
             "timestamp": datetime.now().isoformat()
         }
 
@@ -789,6 +839,8 @@ def manual_restore(chat_id, file_content):
             user_info.update(data.get("user_info", {}))
             user_language.clear()
             user_language.update(data.get("user_language", {}))
+            cancel_tracking.clear()  # রিস্টোর
+            cancel_tracking.update(data.get("cancel_tracking", {}))
             save_all()
         logger.info(f"Manual restore completed: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
         return True
@@ -798,7 +850,7 @@ def manual_restore(chat_id, file_content):
 
 def auto_restore_from_channel():
     global last_backup_message_id, last_backup_part_ids
-    global subscribed_users, credentials, withdraw_requests, config, user_balances, user_info, user_language, created_accounts
+    global subscribed_users, credentials, withdraw_requests, config, user_balances, user_info, user_language, created_accounts, cancel_tracking
 
     channel_id = config.get("channel_id")
     if not channel_id:
@@ -884,6 +936,7 @@ def auto_restore_from_channel():
             user_balances = data.get("user_balances", {})
             user_info = data.get("user_info", {})
             user_language = data.get("user_language", {})
+            cancel_tracking = data.get("cancel_tracking", {})  # রিস্টোর
             last_backup_message_id = pinned["message_id"]
             save_all()
 
@@ -943,7 +996,7 @@ def admin_list_creds(chat_id, page=0, message_id=None):
     total = len(credentials)
     if total == 0:
         lang = get_lang(chat_id)
-        msg = "📭 **No credentials available.**" if lang == "en" else "📭 **কোনো ক্রেডেনশিয়াল নেই।**"
+        msg = "📭 **No credentials available.**" if lang == "en" else "📭 **কোনো ক্রেডেনশিয়াল নেই।**"
         send_message(msg, chat_id, reply_markup=admin_keyboard())
         return
     per_page = 10
@@ -984,7 +1037,7 @@ def admin_delete_single_cred(chat_id, index, message_id):
     deleted = delete_credential_by_index(index)
     if deleted:
         lang = get_lang(chat_id)
-        msg = f"🗑️ `{deleted['email']}` deleted." if lang == "en" else f"🗑️ `{deleted['email']}` ডিলিট করা হয়েছে।"
+        msg = f"🗑️ `{deleted['email']}` deleted." if lang == "en" else f"🗑️ `{deleted['email']}` ডিলিট করা হয়েছে।"
         send_message(msg, chat_id)
         admin_list_creds(chat_id, page=0, message_id=message_id)
     else:
@@ -1138,7 +1191,7 @@ def admin_backup(chat_id):
 
 def admin_restore(chat_id):
     lang = get_lang(chat_id)
-    msg = "📥 **Restore from file**\n\nPlease upload the `.json.gz` backup file." if lang == "en" else "📥 **ফাইল থেকে রিস্টোর**\n\nদয়া করে `.json.gz` ব্যাকআপ ফাইল আপলোড করুন।"
+    msg = "📥 **Restore from file**\n\nPlease upload the `.json.gz` backup file." if lang == "en" else "📥 **ফাইল থেকে রিস্টোর**\n\nদয়া করে `.json.gz` ব্যাকআপ ফাইল আপলোড করুন।"
     send_message(msg, chat_id, reply_markup={"keyboard": [["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True})
     set_session(chat_id, {"restore_mode": True})
 
@@ -1262,7 +1315,7 @@ def start_command(chat_id, chat_type="private"):
         send_message(t("welcome", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
     else:
         lang = get_lang(chat_id)
-        msg = "🤖 I work in private chats. Please `/start` me in private." if lang == "en" else "🤖 আমি প্রাইভেট চ্যাটে কাজ করি। দয়া করে প্রাইভেটে `/start` দিন।"
+        msg = "🤖 I work in private chats. Please `/start` me in private." if lang == "en" else "🤖 আমি প্রাইভেট চ্যাটে কাজ করি। দয়া করে প্রাইভেটে `/start` দিন।"
         send_message(msg, chat_id)
 
 def change_language(chat_id):
@@ -1275,6 +1328,14 @@ def instagram_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
         send_message(t("under_maintenance", chat_id), chat_id)
         return
+    # ব্যান চেক
+    banned, _ = is_banned(chat_id)
+    if banned:
+        remaining = get_ban_remaining(chat_id)
+        hours = remaining // 3600
+        minutes = (remaining % 3600) // 60
+        send_message(t("banned_work", chat_id, hours=hours, minutes=minutes), chat_id)
+        return
     session = get_session(chat_id)
     if session and session.get("active"):
         send_message(t("active_session", chat_id), chat_id)
@@ -1286,12 +1347,19 @@ def start_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
         send_message(t("under_maintenance", chat_id), chat_id)
         return
+    banned, _ = is_banned(chat_id)
+    if banned:
+        remaining = get_ban_remaining(chat_id)
+        hours = remaining // 3600
+        minutes = (remaining % 3600) // 60
+        send_message(t("banned_work", chat_id, hours=hours, minutes=minutes), chat_id)
+        return
     cred = get_available_credential()
     if not cred:
         send_message(t("no_accounts", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
         return
     assign_credential_to_user(cred, chat_id)
-    
+
     set_session(chat_id, {
         "active": True,
         "step": "username_input",
@@ -1321,48 +1389,41 @@ def process_username(chat_id, text):
     return True
 
 def process_twofa(chat_id, text):
-    """স্পেস সহ কী নেয়, ভেরিফাইয়ের জন্য স্পেস সরায়, কিন্তু আসল টেক্সট সেভ করে"""
+    """স্পেস সহ কী নেয়, ভেরিফাইয়ের জন্য স্পেস সরায়, কিন্তু আসল টেক্সট সেভ করে"""
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "twofa":
         return False
-    
-    # ১. ইউজারের দেওয়া আসল টেক্সট (স্পেস সহ) সংরক্ষণ করব
+
     original_key = text.strip()
-    
-    # ২. ভেরিফাইয়ের জন্য স্পেস, ট্যাব, নিউলাইন সরাই
     clean_key = ''.join(original_key.split())
-    
+
     if not clean_key:
-        send_message("❌ **সিক্রেট কী খালি রাখা যাবে না।** দয়া করে সঠিক কী দিন।", chat_id)
+        send_message("❌ **সিক্রেট কী খালি রাখা যাবে না।** দয়া করে সঠিক কী দিন।", chat_id)
         return True
-    
+
     try:
-        # ক্লিন কী দিয়ে TOTP অবজেক্ট তৈরি
         totp = pyotp.TOTP(clean_key)
         current_code = totp.now()
         logger.info(f"2FA code generated for user {chat_id}: {current_code}")
-        
-        # 🔥 সেশনেও আসল টেক্সট (স্পেস সহ) সংরক্ষণ করছি
-        session["twofa"] = original_key          # এক্সেলে যাবে স্পেস সহ
-        session["twofa_code"] = current_code     # জেনারেটেড কোড (যদি দরকার হয়)
-        
+        session["twofa"] = original_key
+        session["twofa_code"] = current_code
     except Exception as e:
         send_message(
-            "❌ **ভুল 2FA সিক্রেট কী!** দয়া করে সঠিক Base32 ফরম্যাটের কী দিন।\n"
+            "❌ **ভুল 2FA সিক্রেট কী!** দয়া করে সঠিক Base32 ফরম্যাটের কী দিন।\n"
             "উদাহরণ: `JBSWY3DPEHPK3PXP` (স্পেস থাকলেও চলবে, বট নিজেই ঠিক করবে)",
             chat_id
         )
         return True
-    
+
     session["step"] = "follow"
     set_session(chat_id, session)
-    
+
     send_message(
         t("twofa_verified", chat_id, code=current_code),
         chat_id, reply_markup=yes_no_keyboard(chat_id)
     )
     return True
-    
+
 def process_follow_yes(chat_id):
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "follow":
@@ -1370,8 +1431,10 @@ def process_follow_yes(chat_id):
     session["step"] = "done"
     set_session(chat_id, session)
     username = session.get("username", "N/A")
-    twofa_secret = session.get("twofa", "N/A")   # সিক্রেট কী
+    twofa_secret = session.get("twofa", "N/A")
     save_created_account(username, session["email"], session["password"], twofa_secret, chat_id)
+    # ক্যানসেল ট্র্যাকিং রিসেট (সফলভাবে শেষ)
+    reset_consecutive_cancels(chat_id)
     send_message(
         t("completed", chat_id,
           username=username,
@@ -1455,18 +1518,16 @@ def handle_updates():
             params = {"timeout": 30, "allowed_updates": ["message", "callback_query"]}
             if last_update_id:
                 params["offset"] = last_update_id + 1
-            # কানেকশন টাইমআউট ৫ সেকেন্ড, রিড টাইমআউট ৩০ সেকেন্ড
             resp = requests.get(url, params=params, timeout=(5, 30)).json()
             if resp.get("ok") and resp.get("result"):
                 for update in resp["result"]:
                     last_update_id = update["update_id"]
                     process_update(update)
         except requests.exceptions.Timeout:
-            # টাইমআউট হলে কোনো কিছু করবেন না – শুধু লুপ চালিয়ে যান
             logger.warning("getUpdates timeout, retrying...")
         except Exception as e:
             logger.error(f"Update loop error: {e}")
-        time.sleep(0.02)   # খুব কম স্লিপ, যাতে দ্রুত পুনরায় চেষ্টা করে
+        time.sleep(0.02)
 
 def process_update(update):
     if "message" in update:
@@ -1494,7 +1555,7 @@ def process_update(update):
             if session and session.get("restore_mode"):
                 if text == "❌ Cancel" or text == "❌ বাতিল":
                     clear_session(chat_id)
-                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
                     return
                 if "document" in msg:
                     file_obj = msg["document"]
@@ -1520,9 +1581,8 @@ def process_update(update):
             if session and session.get("upload_mode") in ["approved", "rejected"]:
                 if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
                     clear_session(chat_id)
-                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
                     return
-                # If it's a document, download content
                 if "document" in msg:
                     file_obj = msg["document"]
                     if file_obj.get("mime_type") == "text/plain" or file_obj.get("file_name", "").endswith(".txt"):
@@ -1543,7 +1603,6 @@ def process_update(update):
                         send_message("❌ Please upload a .txt file or send the list as text.", chat_id)
                     return
                 else:
-                    # Assume text is the list
                     process_uploaded_list(chat_id, text)
                     return
 
@@ -1551,7 +1610,7 @@ def process_update(update):
             if chat_id in admin_cred_upload_session:
                 if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
                     del admin_cred_upload_session[chat_id]
-                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
                     return
                 step = admin_cred_upload_session[chat_id].get("step")
                 if step == "email":
@@ -1631,6 +1690,18 @@ def process_update(update):
                 if len(parts) == 2:
                     admin_reject_withdraw(chat_id, parts[1])
                 return
+            if text.startswith("/unban"):   # নতুন
+                parts = text.split()
+                if len(parts) == 2:
+                    try:
+                        target_id = int(parts[1])
+                        unban_user(target_id)
+                        send_message(t("unbanned_user", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
+                    except:
+                        send_message("❌ Invalid user ID.", chat_id)
+                else:
+                    send_message("Usage: /unban <user_id>", chat_id)
+                return
 
         # ===== USER SECTION =====
         session = get_session(chat_id)
@@ -1638,7 +1709,11 @@ def process_update(update):
         if text == "🌐 Language":
             change_language(chat_id)
             return
-        if text == "❌ Cancel" or text == "❌ বাতিল":
+
+        # ক্যানসেল হ্যান্ডলিং (সক্রিয় সেশন থাকলে ক্যানসেল ট্র্যাক)
+        if text in ["❌ Cancel", "❌ বাতিল"]:
+            if session and session.get("active"):
+                record_cancel(chat_id)
             clear_session(chat_id)
             send_message(t("cancelled", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
             return
@@ -1710,7 +1785,7 @@ def process_update(update):
         elif data == "close_list":
             delete_message(chat_id, message_id)
             lang = get_lang(chat_id)
-            msg = "📋 List closed." if lang == "en" else "📋 তালিকা বন্ধ করা হয়েছে।"
+            msg = "📋 List closed." if lang == "en" else "📋 তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
         elif data.startswith("appw_"):
             w_id = data[5:]
@@ -1726,7 +1801,7 @@ def process_update(update):
         elif data == "close_withdraw":
             delete_message(chat_id, message_id)
             lang = get_lang(chat_id)
-            msg = "📋 Withdraw list closed." if lang == "en" else "📋 উইথড্র তালিকা বন্ধ করা হয়েছে।"
+            msg = "📋 Withdraw list closed." if lang == "en" else "📋 উইথড্র তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
         elif data.startswith("papage_"):
             page = int(data.split("_")[1])
@@ -1734,7 +1809,7 @@ def process_update(update):
         elif data == "close_papprovals":
             delete_message(chat_id, message_id)
             lang = get_lang(chat_id)
-            msg = "📋 Pending approvals list closed." if lang == "en" else "📋 পেন্ডিং অ্যাপ্রুভাল তালিকা বন্ধ করা হয়েছে।"
+            msg = "📋 Pending approvals list closed." if lang == "en" else "📋 পেন্ডিং অ্যাপ্রুভাল তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
 
 # ================== FLASK ==================
