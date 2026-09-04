@@ -32,7 +32,7 @@ USER_BALANCES_FILE = "user_balances.json"
 USER_INFO_FILE = "user_info.json"
 LANGUAGE_FILE = "language.json"
 CREATED_ACCOUNTS_FILE = "created_accounts.json"
-CANCEL_TRACKING_FILE = "cancel_tracking.json"  # নতুন
+CANCEL_TRACKING_FILE = "cancel_tracking.json"
 
 # ================== GLOBALS ==================
 subscribed_users = set()
@@ -40,7 +40,7 @@ user_sessions = {}
 credentials = []
 withdraw_requests = []
 created_accounts = []  # status: pending/approved/rejected
-cancel_tracking = {}   # নতুন: cancel ট্র্যাকিং
+cancel_tracking = {}
 config = {
     "base_balance": 10.0,
     "channel_id": CHANNEL_ID,
@@ -100,7 +100,7 @@ def load_all():
     user_balances = load_json(USER_BALANCES_FILE, {})
     user_info = load_json(USER_INFO_FILE, {})
     user_language = load_json(LANGUAGE_FILE, {})
-    cancel_tracking = load_json(CANCEL_TRACKING_FILE, {})  # নতুন
+    cancel_tracking = load_json(CANCEL_TRACKING_FILE, {})
 
     cfg = load_json(CONFIG_FILE, {})
     for k in config:
@@ -122,7 +122,7 @@ def save_all():
     save_json(USER_BALANCES_FILE, user_balances)
     save_json(USER_INFO_FILE, user_info)
     save_json(LANGUAGE_FILE, user_language)
-    save_json(CANCEL_TRACKING_FILE, cancel_tracking)      # নতুন
+    save_json(CANCEL_TRACKING_FILE, cancel_tracking)
     trigger_backup()
 
 # ================== DEBOUNCED BACKUP ==================
@@ -259,8 +259,24 @@ def t(key, user_id, **kwargs):
             "clear_exported_success": "🗑️ **{count} exported records cleared successfully!**",
             "export_excel": "📥 **Export Excel**\n\nClick below to download all created accounts as Excel file.",
             "excel_exported": "✅ **Excel file exported!**",
-            "banned_work": "⛔ You are temporarily banned from Instagram work for {hours}h {minutes}m. Please try again later.",  # নতুন
-            "unbanned_user": "✅ User {user_id} has been unbanned.",  # নতুন
+            "banned_work": "⛔ You are temporarily banned from Instagram work for {hours}h {minutes}m. Please try again later.",
+            "unbanned_user": "✅ User {user_id} has been unbanned.",
+            "my_accounts": "📜 My Accounts",
+            "my_accounts_list": "📜 **My Account History** (Page {page}/{total_pages})\n\n",
+            "my_account_item": "👤 Username: `{username}`\n📧 Email: `{email}`\n🔑 Password: `{password}`\n🔐 2FA Secret: `{twofa}`\n📌 Status: {status}\n🕒 {time}\n",
+            "no_my_accounts": "📭 You haven't created any accounts yet.",
+            "support_message": "📞 **Support**\n\nFor any help, contact:\n@mahirlabib45",
+            "user_list": "👥 **User List** (Page {page}/{total_pages})\n\n",
+            "user_list_item": "🆔 `{id}`\n💰 Balance: {balance:.2f} BDT\n📦 Accounts: {total}\nStatus: {status}\n\n",
+            "no_users": "No users found.",
+            "banned_list": "🚫 **Banned Users** (Page {page}/{total_pages})\n\n",
+            "banned_user_item": "🆔 `{id}`\n⏳ Ban Remaining: {ban_time}\n\n",
+            "no_banned_users": "🚫 No banned users.",
+            "ban_success": "✅ User {user_id} has been banned.",
+            "unban_success": "✅ User {user_id} has been unbanned.",
+            "broadcast_prompt": "📢 **Broadcast Message**\n\nSend the message you want to broadcast to all users.\nType /cancel to abort.",
+            "broadcast_success": "✅ Broadcast sent successfully.",
+            "broadcast_cancelled": "❌ Broadcast cancelled.",
         },
         "bn": {
             "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
@@ -318,8 +334,24 @@ def t(key, user_id, **kwargs):
             "clear_exported_success": "🗑️ **{count} টি এক্সপোর্ট করা রেকর্ড মুছে ফেলা হয়েছে!**",
             "export_excel": "📥 **এক্সেল এক্সপোর্ট**\n\nনিচের বাটনে ক্লিক করে সব অ্যাকাউন্টের Excel ফাইল ডাউনলোড করুন।",
             "excel_exported": "✅ **Excel ফাইল তৈরি হয়েছে!**",
-            "banned_work": "⛔ আপনি Instagram কাজ থেকে {hours} ঘণ্টা {minutes} মিনিটের জন্য ব্যান হয়েছেন। পরে আবার চেষ্টা করুন।",  # নতুন
-            "unbanned_user": "✅ ইউজার {user_id} কে আনব্যান করা হয়েছে।",  # নতুন
+            "banned_work": "⛔ আপনি Instagram কাজ থেকে {hours} ঘণ্টা {minutes} মিনিটের জন্য ব্যান হয়েছেন। পরে আবার চেষ্টা করুন।",
+            "unbanned_user": "✅ ইউজার {user_id} কে আনব্যান করা হয়েছে।",
+            "my_accounts": "📜 আমার অ্যাকাউন্ট",
+            "my_accounts_list": "📜 **আমার অ্যাকাউন্ট ইতিহাস** (পৃষ্ঠা {page}/{total_pages})\n\n",
+            "my_account_item": "👤 ইউজারনেম: `{username}`\n📧 ইমেইল: `{email}`\n🔑 পাসওয়ার্ড: `{password}`\n🔐 2FA সিক্রেট: `{twofa}`\n📌 স্ট্যাটাস: {status}\n🕒 {time}\n",
+            "no_my_accounts": "📭 আপনি এখনো কোনো অ্যাকাউন্ট খোলেননি।",
+            "support_message": "📞 **সাপোর্ট**\n\nসাহায্যের জন্য যোগাযোগ করুন:\n@mahirlabib45",
+            "user_list": "👥 **ইউজার লিস্ট** (পৃষ্ঠা {page}/{total_pages})\n\n",
+            "user_list_item": "🆔 `{id}`\n💰 ব্যালেন্স: {balance:.2f} টাকা\n📦 অ্যাকাউন্ট: {total}\nস্ট্যাটাস: {status}\n\n",
+            "no_users": "কোনো ইউজার পাওয়া যায়নি।",
+            "banned_list": "🚫 **ব্যানড ইউজার** (পৃষ্ঠা {page}/{total_pages})\n\n",
+            "banned_user_item": "🆔 `{id}`\n⏳ ব্যান বাকি: {ban_time}\n\n",
+            "no_banned_users": "🚫 কোনো ব্যানড ইউজার নেই।",
+            "ban_success": "✅ ইউজার {user_id} কে ব্যান করা হয়েছে।",
+            "unban_success": "✅ ইউজার {user_id} কে আনব্যান করা হয়েছে।",
+            "broadcast_prompt": "📢 **ব্রডকাস্ট মেসেজ**\n\nসব ইউজারকে পাঠানোর জন্য মেসেজ লিখুন।\nবাতিল করতে /cancel লিখুন।",
+            "broadcast_success": "✅ ব্রডকাস্ট সফলভাবে পাঠানো হয়েছে।",
+            "broadcast_cancelled": "❌ ব্রডকাস্ট বাতিল করা হয়েছে।",
         }
     }
     text = translations.get(lang, translations["en"]).get(key, key)
@@ -351,7 +383,7 @@ def get_balance_text(user_id):
     total_accounts = user_info.get(uid, {}).get("total_accounts", 0)
     return t("balance", user_id, balance=balance, total=total_accounts)
 
-# ================== BAN HELPERS (নতুন) ==================
+# ================== BAN HELPERS ==================
 def record_cancel(user_id):
     uid = str(user_id)
     now = time.time()
@@ -359,12 +391,10 @@ def record_cancel(user_id):
         ct = cancel_tracking.setdefault(uid, {"consecutive": 0, "timestamps": [], "ban_end": 0})
         ct["consecutive"] += 1
         ct["timestamps"].append(now)
-        # শুধু গত ২৪ ঘণ্টার টাইমস্ট্যাম্প রাখা
         ct["timestamps"] = [t for t in ct["timestamps"] if now - t <= 86400]
-        # ব্যান শর্ত চেক
         if ct["consecutive"] >= 3 or len(ct["timestamps"]) >= 5:
             ct["ban_end"] = now + 86400
-            ct["consecutive"] = 0   # নতুন চক্রের জন্য রিসেট
+            ct["consecutive"] = 0
         save_json(CANCEL_TRACKING_FILE, cancel_tracking)
 
 def reset_consecutive_cancels(user_id):
@@ -376,30 +406,44 @@ def reset_consecutive_cancels(user_id):
 
 def is_banned(user_id):
     ct = cancel_tracking.get(str(user_id))
-    if ct and ct.get("ban_end", 0) > time.time():
-        return True, ct["ban_end"]
+    if ct:
+        if ct.get("manual_ban", False):
+            return True, -1
+        if ct.get("ban_end", 0) > time.time():
+            return True, ct["ban_end"]
     return False, 0
 
 def get_ban_remaining(user_id):
     ct = cancel_tracking.get(str(user_id))
-    if ct and ct.get("ban_end", 0) > time.time():
-        return int(ct["ban_end"] - time.time())
+    if ct:
+        if ct.get("manual_ban", False):
+            return -1
+        if ct.get("ban_end", 0) > time.time():
+            return int(ct["ban_end"] - time.time())
     return 0
 
 def unban_user(user_id):
     uid = str(user_id)
     with data_lock:
         if uid in cancel_tracking:
-            cancel_tracking[uid]["ban_end"] = 0
-            cancel_tracking[uid]["consecutive"] = 0
+            del cancel_tracking[uid]
             save_json(CANCEL_TRACKING_FILE, cancel_tracking)
+
+def manual_ban_user(user_id):
+    uid = str(user_id)
+    with data_lock:
+        ct = cancel_tracking.setdefault(uid, {"consecutive": 0, "timestamps": [], "ban_end": 0})
+        ct["manual_ban"] = True
+        ct["ban_end"] = 0
+        save_json(CANCEL_TRACKING_FILE, cancel_tracking)
 
 # ================== KEYBOARDS ==================
 def main_keyboard(chat_id):
     lang = get_lang(chat_id)
     kb = [
         ["📱 Instagram Work", "💰 Balance"],
-        ["💸 Withdraw", "🌐 Language"]
+        ["💸 Withdraw", "🌐 Language"],
+        ["📜 My Accounts", "📞 Support"]
     ]
     if str(chat_id) == ADMIN_CHAT_ID:
         kb.append(["⚙️ Admin Panel"])
@@ -416,7 +460,9 @@ def admin_keyboard():
             ["📥 Restore", f"🔧 Maintenance {maint_status}"],
             ["📋 Pending Approvals", "📥 Export Excel"],
             ["📤 Upload Approved", "📤 Upload Rejected"],
-            ["🗑️ Clear Exported Accounts", "🔙 Main Menu"]
+            ["🗑️ Clear Exported Accounts", "🔙 Main Menu"],
+            ["👥 User List", "🚫 Banned Users"],
+            ["📢 Broadcast"]
         ],
         "resize_keyboard": True
     }
@@ -516,7 +562,7 @@ def save_created_account(username, email, password, twofa, user_id):
             "username": username,
             "email": email,
             "password": password,
-            "twofa": twofa,  # এখানে সিক্রেট কী সংরক্ষিত হবে
+            "twofa": twofa,
             "user_id": str(user_id),
             "timestamp": time.time(),
             "status": "pending"
@@ -716,7 +762,7 @@ def generate_backup_data():
             "user_balances": user_balances,
             "user_info": user_info,
             "user_language": user_language,
-            "cancel_tracking": cancel_tracking,  # ব্যাকআপে অন্তর্ভুক্ত
+            "cancel_tracking": cancel_tracking,
             "timestamp": datetime.now().isoformat()
         }
 
@@ -839,7 +885,7 @@ def manual_restore(chat_id, file_content):
             user_info.update(data.get("user_info", {}))
             user_language.clear()
             user_language.update(data.get("user_language", {}))
-            cancel_tracking.clear()  # রিস্টোর
+            cancel_tracking.clear()
             cancel_tracking.update(data.get("cancel_tracking", {}))
             save_all()
         logger.info(f"Manual restore completed: {len(subscribed_users)} users, {len(credentials)} credentials, {len(created_accounts)} created accounts")
@@ -936,7 +982,7 @@ def auto_restore_from_channel():
             user_balances = data.get("user_balances", {})
             user_info = data.get("user_info", {})
             user_language = data.get("user_language", {})
-            cancel_tracking = data.get("cancel_tracking", {})  # রিস্টোর
+            cancel_tracking = data.get("cancel_tracking", {})
             last_backup_message_id = pinned["message_id"]
             save_all()
 
@@ -1289,14 +1335,144 @@ def process_uploaded_list(chat_id, text_or_file_content):
     clear_session(chat_id)
     return True
 
-# ================== NEW: CLEAR EXPORTED ACCOUNTS ==================
+# ================== CLEAR EXPORTED ACCOUNTS ==================
 def admin_clear_created_accounts(chat_id):
-    """সব created_accounts (এক্সপোর্ট করা রেকর্ড) মুছে ফেলে"""
     with data_lock:
         count = len(created_accounts)
         created_accounts.clear()
         save_json(CREATED_ACCOUNTS_FILE, created_accounts)
     send_message(t("clear_exported_success", chat_id, count=count), chat_id, reply_markup=admin_keyboard())
+
+# ================== USER MY ACCOUNTS ==================
+def show_my_accounts(chat_id, page=0, message_id=None):
+    uid = str(chat_id)
+    my_accs = [a for a in created_accounts if a.get("user_id") == uid]
+    if not my_accs:
+        send_message(t("no_my_accounts", chat_id), chat_id)
+        return
+    per_page = 5
+    total_pages = (len(my_accs) + per_page - 1) // per_page
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    end = min(start + per_page, len(my_accs))
+    page_items = my_accs[start:end]
+    lines = [t("my_accounts_list", chat_id, page=page+1, total_pages=total_pages)]
+    for acc in page_items:
+        time_str = datetime.fromtimestamp(acc["timestamp"]).strftime("%d/%m %H:%M")
+        status = acc.get("status", "pending")
+        twofa = acc.get("twofa", "N/A")
+        lines.append(t("my_account_item", chat_id,
+                       username=acc.get("username","N/A"),
+                       email=acc.get("email","N/A"),
+                       password=acc.get("password","N/A"),
+                       twofa=twofa,
+                       status=status,
+                       time=time_str))
+    text = "\n".join(lines)
+    kb = {"inline_keyboard": []}
+    nav = []
+    if page > 0:
+        nav.append({"text": "⬅️", "callback_data": f"myacc_{page-1}"})
+    if page < total_pages - 1:
+        nav.append({"text": "➡️", "callback_data": f"myacc_{page+1}"})
+    if nav:
+        kb["inline_keyboard"].append(nav)
+    kb["inline_keyboard"].append([{"text": "🔙 Close", "callback_data": "close_myacc"}])
+    if message_id:
+        edit_message_text(chat_id, message_id, text, reply_markup=kb)
+    else:
+        send_message(text, chat_id, reply_markup=kb)
+
+# ================== ADMIN USER LIST & BAN MANAGEMENT ==================
+def admin_show_user_list(chat_id, page=0, message_id=None):
+    users = list(subscribed_users)
+    if not users:
+        send_message(t("no_users", chat_id), chat_id)
+        return
+    per_page = 10
+    total_pages = (len(users) + per_page - 1) // per_page
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    end = min(start + per_page, len(users))
+    page_users = users[start:end]
+    lines = [t("user_list", chat_id, page=page+1, total_pages=total_pages)]
+    for uid in page_users:
+        balance = user_balances.get(str(uid), 0.0)
+        total_acc = user_info.get(str(uid), {}).get("total_accounts", 0)
+        banned, _ = is_banned(uid)
+        ban_status = "🔴 Banned" if banned else "🟢 Active"
+        lines.append(t("user_list_item", chat_id,
+                       id=uid,
+                       balance=balance,
+                       total=total_acc,
+                       status=ban_status))
+    text = "\n".join(lines)
+    kb = {"inline_keyboard": []}
+    nav = []
+    if page > 0:
+        nav.append({"text": "⬅️", "callback_data": f"usrlist_{page-1}"})
+    if page < total_pages - 1:
+        nav.append({"text": "➡️", "callback_data": f"usrlist_{page+1}"})
+    if nav:
+        kb["inline_keyboard"].append(nav)
+    for uid in page_users:
+        banned, _ = is_banned(uid)
+        if not banned:
+            kb["inline_keyboard"].append([{"text": f"🔨 Ban {uid}", "callback_data": f"banuser_{uid}"}])
+        else:
+            kb["inline_keyboard"].append([{"text": f"✅ Unban {uid}", "callback_data": f"unbanuser_{uid}"}])
+    kb["inline_keyboard"].append([{"text": "🔙 Close", "callback_data": "close_userlist"}])
+    if message_id:
+        edit_message_text(chat_id, message_id, text, reply_markup=kb)
+    else:
+        send_message(text, chat_id, reply_markup=kb)
+
+def admin_show_banned_users(chat_id, page=0, message_id=None):
+    banned_users = [uid for uid in subscribed_users if is_banned(uid)[0]]
+    if not banned_users:
+        send_message(t("no_banned_users", chat_id), chat_id)
+        return
+    per_page = 10
+    total_pages = (len(banned_users) + per_page - 1) // per_page
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    end = min(start + per_page, len(banned_users))
+    page_users = banned_users[start:end]
+    lines = [t("banned_list", chat_id, page=page+1, total_pages=total_pages)]
+    for uid in page_users:
+        banned, ban_end = is_banned(uid)
+        if ban_end == -1:
+            ban_time = "Manual Ban"
+        else:
+            remaining = get_ban_remaining(uid)
+            if remaining > 0:
+                hours = remaining // 3600
+                minutes = (remaining % 3600) // 60
+                ban_time = f"{hours}h {minutes}m"
+            else:
+                ban_time = "Unknown"
+        lines.append(t("banned_user_item", chat_id, id=uid, ban_time=ban_time))
+    text = "\n".join(lines)
+    kb = {"inline_keyboard": []}
+    nav = []
+    if page > 0:
+        nav.append({"text": "⬅️", "callback_data": f"banlist_{page-1}"})
+    if page < total_pages - 1:
+        nav.append({"text": "➡️", "callback_data": f"banlist_{page+1}"})
+    if nav:
+        kb["inline_keyboard"].append(nav)
+    for uid in page_users:
+        kb["inline_keyboard"].append([{"text": f"✅ Unban {uid}", "callback_data": f"unbanuser_{uid}"}])
+    kb["inline_keyboard"].append([{"text": "🔙 Close", "callback_data": "close_banlist"}])
+    if message_id:
+        edit_message_text(chat_id, message_id, text, reply_markup=kb)
+    else:
+        send_message(text, chat_id, reply_markup=kb)
+
+# ================== BROADCAST ==================
+def admin_broadcast_prompt(chat_id):
+    set_session(chat_id, {"broadcast_mode": True})
+    send_message(t("broadcast_prompt", chat_id), chat_id, reply_markup=cancel_keyboard(chat_id))
 
 # ================== USER COMMANDS ==================
 def start_command(chat_id, chat_type="private"):
@@ -1328,13 +1504,15 @@ def instagram_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
         send_message(t("under_maintenance", chat_id), chat_id)
         return
-    # ব্যান চেক
     banned, _ = is_banned(chat_id)
     if banned:
         remaining = get_ban_remaining(chat_id)
-        hours = remaining // 3600
-        minutes = (remaining % 3600) // 60
-        send_message(t("banned_work", chat_id, hours=hours, minutes=minutes), chat_id)
+        if remaining == -1:
+            send_message("⛔ You are permanently banned by admin.", chat_id)
+        else:
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            send_message(t("banned_work", chat_id, hours=hours, minutes=minutes), chat_id)
         return
     session = get_session(chat_id)
     if session and session.get("active"):
@@ -1350,9 +1528,12 @@ def start_work(chat_id):
     banned, _ = is_banned(chat_id)
     if banned:
         remaining = get_ban_remaining(chat_id)
-        hours = remaining // 3600
-        minutes = (remaining % 3600) // 60
-        send_message(t("banned_work", chat_id, hours=hours, minutes=minutes), chat_id)
+        if remaining == -1:
+            send_message("⛔ You are permanently banned by admin.", chat_id)
+        else:
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            send_message(t("banned_work", chat_id, hours=hours, minutes=minutes), chat_id)
         return
     cred = get_available_credential()
     if not cred:
@@ -1389,7 +1570,6 @@ def process_username(chat_id, text):
     return True
 
 def process_twofa(chat_id, text):
-    """স্পেস সহ কী নেয়, ভেরিফাইয়ের জন্য স্পেস সরায়, কিন্তু আসল টেক্সট সেভ করে"""
     session = get_session(chat_id)
     if not session or not session.get("active") or session.get("step") != "twofa":
         return False
@@ -1433,7 +1613,6 @@ def process_follow_yes(chat_id):
     username = session.get("username", "N/A")
     twofa_secret = session.get("twofa", "N/A")
     save_created_account(username, session["email"], session["password"], twofa_secret, chat_id)
-    # ক্যানসেল ট্র্যাকিং রিসেট (সফলভাবে শেষ)
     reset_consecutive_cancels(chat_id)
     send_message(
         t("completed", chat_id,
@@ -1606,6 +1785,22 @@ def process_update(update):
                     process_uploaded_list(chat_id, text)
                     return
 
+            # Handle broadcast mode
+            if session and session.get("broadcast_mode"):
+                if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
+                    clear_session(chat_id)
+                    send_message(t("broadcast_cancelled", chat_id), chat_id, reply_markup=admin_keyboard())
+                    return
+                # Send broadcast to all users
+                for uid in list(subscribed_users):
+                    try:
+                        send_message(text, uid)
+                    except:
+                        pass
+                send_message(t("broadcast_success", chat_id), chat_id, reply_markup=admin_keyboard())
+                clear_session(chat_id)
+                return
+
             # Admin normal commands
             if chat_id in admin_cred_upload_session:
                 if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
@@ -1670,6 +1865,15 @@ def process_update(update):
             if text == "🔙 Main Menu":
                 send_message("Main Menu", chat_id, reply_markup=main_keyboard(chat_id))
                 return
+            if text == "👥 User List":
+                admin_show_user_list(chat_id)
+                return
+            if text == "🚫 Banned Users":
+                admin_show_banned_users(chat_id)
+                return
+            if text == "📢 Broadcast":
+                admin_broadcast_prompt(chat_id)
+                return
 
             if text.startswith("/setprice"):
                 admin_set_price(chat_id, text)
@@ -1690,7 +1894,7 @@ def process_update(update):
                 if len(parts) == 2:
                     admin_reject_withdraw(chat_id, parts[1])
                 return
-            if text.startswith("/unban"):   # নতুন
+            if text.startswith("/unban"):
                 parts = text.split()
                 if len(parts) == 2:
                     try:
@@ -1710,7 +1914,6 @@ def process_update(update):
             change_language(chat_id)
             return
 
-        # ক্যানসেল হ্যান্ডলিং (সক্রিয় সেশন থাকলে ক্যানসেল ট্র্যাক)
         if text in ["❌ Cancel", "❌ বাতিল"]:
             if session and session.get("active"):
                 record_cancel(chat_id)
@@ -1746,8 +1949,13 @@ def process_update(update):
         if text == "💸 Nagad":
             withdraw_request(chat_id, "nagad")
             return
+        if text == "📜 My Accounts":
+            show_my_accounts(chat_id)
+            return
+        if text == "📞 Support":
+            send_message(t("support_message", chat_id), chat_id)
+            return
 
-        # Session processing
         if session:
             if session.get("withdraw_step") == "account":
                 process_withdraw_account(chat_id, text)
@@ -1811,6 +2019,44 @@ def process_update(update):
             lang = get_lang(chat_id)
             msg = "📋 Pending approvals list closed." if lang == "en" else "📋 পেন্ডিং অ্যাপ্রুভাল তালিকা বন্ধ করা হয়েছে।"
             send_message(msg, chat_id, reply_markup=admin_keyboard())
+        elif data.startswith("myacc_"):
+            page = int(data.split("_")[1])
+            show_my_accounts(chat_id, page=page, message_id=message_id)
+        elif data == "close_myacc":
+            delete_message(chat_id, message_id)
+            send_message("Closed.", chat_id, reply_markup=main_keyboard(chat_id))
+        elif data.startswith("usrlist_"):
+            page = int(data.split("_")[1])
+            admin_show_user_list(chat_id, page=page, message_id=message_id)
+        elif data.startswith("banlist_"):
+            page = int(data.split("_")[1])
+            admin_show_banned_users(chat_id, page=page, message_id=message_id)
+        elif data == "close_userlist":
+            delete_message(chat_id, message_id)
+            send_message("Closed.", chat_id, reply_markup=admin_keyboard())
+        elif data == "close_banlist":
+            delete_message(chat_id, message_id)
+            send_message("Closed.", chat_id, reply_markup=admin_keyboard())
+        elif data.startswith("banuser_"):
+            uid = data.split("_",1)[1]
+            manual_ban_user(uid)
+            send_message(t("ban_success", chat_id, user_id=uid), chat_id)
+            try:
+                send_message("You have been banned by admin.", uid)
+            except:
+                pass
+            delete_message(chat_id, message_id)
+            admin_show_user_list(chat_id)
+        elif data.startswith("unbanuser_"):
+            uid = data.split("_",1)[1]
+            unban_user(uid)
+            send_message(t("unban_success", chat_id, user_id=uid), chat_id)
+            try:
+                send_message("You have been unbanned by admin.", uid)
+            except:
+                pass
+            delete_message(chat_id, message_id)
+            admin_show_banned_users(chat_id)
 
 # ================== FLASK ==================
 @app.route("/")
