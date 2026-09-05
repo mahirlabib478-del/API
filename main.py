@@ -1492,12 +1492,11 @@ def admin_show_user_list(chat_id, page=0, message_id=None):
         nav.append({"text": "➡️", "callback_data": f"usrlist_{page+1}"})
     if nav:
         kb["inline_keyboard"].append(nav)
+    # শুধুমাত্র ব্যানড নয় এমন ইউজারদের জন্য Ban বাটন দেখাও
     for uid in page_users:
         banned, _ = is_banned(uid)
         if not banned:
             kb["inline_keyboard"].append([{"text": f"🔨 Ban {uid}", "callback_data": f"banuser_{uid}"}])
-        else:
-            kb["inline_keyboard"].append([{"text": f"✅ Unban {uid}", "callback_data": f"unbanuser_{uid}"}])
     kb["inline_keyboard"].append([{"text": "🔙 Close", "callback_data": "close_userlist"}])
     if message_id:
         edit_message_text(chat_id, message_id, text, reply_markup=kb)
@@ -1813,20 +1812,24 @@ def process_update(update):
         chat_type = msg["chat"]["type"]
         text = msg.get("text", "").strip()
 
-        # Subscribe new users
+        # নতুন ইউজার সাবস্ক্রাইব
         if chat_id not in subscribed_users:
             with data_lock:
                 subscribed_users.add(chat_id)
                 save_all()
 
-        # Version check
+        # ভার্সন চেক
         uid = str(chat_id)
         if uid in user_info:
             user_version = user_info[uid].get("last_version", "0")
             current_version = config.get("bot_version", "0")
             if user_version != current_version and text != "/start":
                 lang = get_lang(chat_id)
-                msg_text = "🔄 **Bot updated!** Please press /start to continue." if lang == "en" else "🔄 **বট আপডেট হয়েছে!** চালিয়ে যেতে /start চাপুন।"
+                msg_text = (
+                    "🔄 **Bot updated!** Please press /start to continue."
+                    if lang == "en" else
+                    "🔄 **বট আপডেট হয়েছে!** চালিয়ে যেতে /start চাপুন।"
+                )
                 send_message(msg_text, chat_id)
                 return
 
@@ -1838,7 +1841,7 @@ def process_update(update):
         if chat_type != "private":
             return
 
-        # Update username
+        # ইউজারনেম আপডেট
         if "from" in msg and "username" in msg["from"]:
             uname = msg["from"]["username"]
             uid = str(chat_id)
@@ -1846,11 +1849,11 @@ def process_update(update):
                 user_info[uid]["username"] = uname
                 save_json(USER_INFO_FILE, user_info)
 
-        # Admin section
+        # ================= ADMIN SECTION =================
         if chat_id == ADMIN_CHAT_ID:
             session = get_session(chat_id)
 
-            # Restore mode
+            # রিস্টোর মোড
             if session and session.get("restore_mode"):
                 if text in ["❌ Cancel", "❌ বাতিল"]:
                     clear_session(chat_id)
@@ -1869,7 +1872,7 @@ def process_update(update):
                     send_message("Please upload .json.gz file.", chat_id)
                 return
 
-            # Upload list mode
+            # আপলোড লিস্ট মোড
             if session and session.get("upload_mode") in ["approved", "rejected"]:
                 if text in ["/cancel", "❌ Cancel", "❌ বাতিল"]:
                     clear_session(chat_id)
@@ -1888,7 +1891,7 @@ def process_update(update):
                     process_uploaded_list(chat_id, text)
                 return
 
-            # Broadcast mode
+            # ব্রডকাস্ট মোড
             if session and session.get("broadcast_mode"):
                 if text in ["/cancel", "❌ Cancel", "❌ বাতিল"]:
                     clear_session(chat_id)
@@ -1903,7 +1906,7 @@ def process_update(update):
                 clear_session(chat_id)
                 return
 
-            # Method awaiting sessions
+            # মেথড ভিডিও/ভয়েস সেশন
             if session and session.get("awaiting_method_video"):
                 if msg.get("video"):
                     admin_set_method_video(chat_id, msg["video"]["file_id"])
@@ -1917,7 +1920,7 @@ def process_update(update):
                     send_message("Send a voice file.", chat_id)
                 return
 
-            # Credentials upload session
+            # ক্রেডেনশিয়াল আপলোড সেশন
             if chat_id in admin_cred_upload_session:
                 if text in ["/cancel", "❌ Cancel", "❌ বাতিল"]:
                     del admin_cred_upload_session[chat_id]
@@ -1930,7 +1933,7 @@ def process_update(update):
                     process_admin_creds_password(chat_id, text)
                 return
 
-            # Admin buttons
+            # অ্যাডমিন বাটন
             if text == "⚙️ Admin Panel":
                 admin_panel(chat_id)
                 return
@@ -1995,7 +1998,7 @@ def process_update(update):
                 send_message(t("method_help", chat_id), chat_id, reply_markup=admin_keyboard())
                 return
 
-            # Admin commands
+            # অ্যাডমিন কমান্ড
             if text.startswith("/setprice"):
                 admin_set_price(chat_id, text)
                 return
@@ -2024,7 +2027,7 @@ def process_update(update):
                             send_message("You cannot ban yourself.", chat_id)
                         else:
                             manual_ban_user(target_id)
-                            send_message(t("ban_success", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
+                            send_message(t("ban_success", chat_id, target=target_id), chat_id, reply_markup=admin_keyboard())
                             try:
                                 send_message("You have been banned by admin.", target_id)
                             except:
@@ -2040,7 +2043,7 @@ def process_update(update):
                     target_id = get_user_id_from_identifier(parts[1])
                     if target_id:
                         unban_user(target_id)
-                        send_message(t("unban_success", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
+                        send_message(t("unban_success", chat_id, target=target_id), chat_id, reply_markup=admin_keyboard())
                         try:
                             send_message("You have been unbanned by admin.", target_id)
                         except:
@@ -2071,7 +2074,7 @@ def process_update(update):
                     send_message("Usage: /setmethodtype <text|video|voice|all>", chat_id)
                 return
 
-        # User section
+        # ================= USER SECTION =================
         session = get_session(chat_id)
 
         if text == "🌐 Language":
@@ -2196,26 +2199,29 @@ def process_update(update):
         elif data == "close_banlist":
             delete_message(chat_id, message_id)
             send_message("Closed.", chat_id, reply_markup=admin_keyboard())
+
+        # ব্যান / আনব্যান কলব্যাক (fixed)
         elif data.startswith("banuser_"):
             uid = data.split("_",1)[1]
             manual_ban_user(uid)
-            send_message(t("ban_success", chat_id, user_id=uid), chat_id)
+            send_message(t("ban_success", chat_id, target=uid), chat_id)
             try:
                 send_message("You have been banned by admin.", uid)
             except:
                 pass
-            delete_message(chat_id, message_id)
-            admin_show_user_list(chat_id)
+            # একই মেসেজে ইউজার লিস্ট রিফ্রেশ
+            admin_show_user_list(chat_id, page=0, message_id=message_id)
+
         elif data.startswith("unbanuser_"):
             uid = data.split("_",1)[1]
             unban_user(uid)
-            send_message(t("unban_success", chat_id, user_id=uid), chat_id)
+            send_message(t("unban_success", chat_id, target=uid), chat_id)
             try:
                 send_message("You have been unbanned by admin.", uid)
             except:
                 pass
-            delete_message(chat_id, message_id)
-            admin_show_banned_users(chat_id)
+            # ব্যানড ইউজার লিস্ট রিফ্রেশ
+            admin_show_banned_users(chat_id, page=0, message_id=message_id)
 
 # ================== FLASK ==================
 @app.route("/")
