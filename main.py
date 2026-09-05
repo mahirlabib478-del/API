@@ -39,13 +39,17 @@ subscribed_users = set()
 user_sessions = {}
 credentials = []
 withdraw_requests = []
-created_accounts = []  # status: pending/approved/rejected
+created_accounts = []
 cancel_tracking = {}
 config = {
     "base_balance": 10.0,
     "channel_id": CHANNEL_ID,
     "maintenance_mode": False,
-    "bot_version": "0",   # auto-generated on start
+    "bot_version": "0",
+    "method_text": "",
+    "method_video_file_id": "",
+    "method_voice_file_id": "",
+    "method_type": "text",
     "work_rules_en": "📱 **Instagram Account Opening Guidelines**\n\n"
                      "1️⃣ You will receive an email and password.\n"
                      "2️⃣ Enter your Instagram username.\n"
@@ -278,6 +282,14 @@ def t(key, user_id, **kwargs):
             "broadcast_prompt": "📢 **Broadcast Message**\n\nSend the message you want to broadcast to all users.\nType /cancel to abort.",
             "broadcast_success": "✅ Broadcast sent successfully.",
             "broadcast_cancelled": "❌ Broadcast cancelled.",
+            "method": "📘 Method",
+            "method_content": "📘 **Method**\n\n{content}",
+            "no_method": "No method set yet.",
+            "method_set_text": "✅ Method text updated.",
+            "method_set_video": "✅ Method video saved.",
+            "method_set_voice": "✅ Method voice saved.",
+            "method_type_set": "✅ Method type set to {type}.",
+            "method_help": "Commands:\n/setmethodtext <text>\n/setmethodvideo (then send video)\n/setmethodvoice (then send voice)\n/setmethodtype <text|video|voice|all>",
         },
         "bn": {
             "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
@@ -353,6 +365,14 @@ def t(key, user_id, **kwargs):
             "broadcast_prompt": "📢 **ব্রডকাস্ট মেসেজ**\n\nসব ইউজারকে পাঠানোর জন্য মেসেজ লিখুন।\nবাতিল করতে /cancel লিখুন।",
             "broadcast_success": "✅ ব্রডকাস্ট সফলভাবে পাঠানো হয়েছে।",
             "broadcast_cancelled": "❌ ব্রডকাস্ট বাতিল করা হয়েছে।",
+            "method": "📘 পদ্ধতি",
+            "method_content": "📘 **পদ্ধতি**\n\n{content}",
+            "no_method": "এখনো কোনো পদ্ধতি সেট করা হয়নি।",
+            "method_set_text": "✅ পদ্ধতির টেক্সট আপডেট হয়েছে।",
+            "method_set_video": "✅ পদ্ধতির ভিডিও সংরক্ষিত হয়েছে।",
+            "method_set_voice": "✅ পদ্ধতির ভয়েস সংরক্ষিত হয়েছে।",
+            "method_type_set": "✅ পদ্ধতির ধরন {type} সেট হয়েছে।",
+            "method_help": "কমান্ডসমূহ:\n/setmethodtext <text>\n/setmethodvideo (তারপর ভিডিও পাঠান)\n/setmethodvoice (তারপর ভয়েস পাঠান)\n/setmethodtype <text|video|voice|all>",
         }
     }
     text = translations.get(lang, translations["en"]).get(key, key)
@@ -440,11 +460,11 @@ def manual_ban_user(user_id):
 
 # ================== KEYBOARDS ==================
 def main_keyboard(chat_id):
-    lang = get_lang(chat_id)
     kb = [
         ["📱 Instagram Work", "💰 Balance"],
         ["💸 Withdraw", "🌐 Language"],
-        ["📜 My Accounts", "📞 Support"]
+        ["📜 My Accounts", "📞 Support"],
+        ["📘 Method"]
     ]
     if str(chat_id) == ADMIN_CHAT_ID:
         kb.append(["⚙️ Admin Panel"])
@@ -463,68 +483,34 @@ def admin_keyboard():
             ["📤 Upload Approved", "📤 Upload Rejected"],
             ["🗑️ Clear Exported Accounts", "🔙 Main Menu"],
             ["👥 User List", "🚫 Banned Users"],
-            ["📢 Broadcast"]
+            ["📢 Broadcast", "📝 Set Method"]
         ],
         "resize_keyboard": True
     }
 
 def cancel_keyboard(chat_id):
     lang = get_lang(chat_id)
-    return {
-        "keyboard": [
-            ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
-        ],
-        "resize_keyboard": True
-    }
+    return {"keyboard": [["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True}
 
 def yes_no_keyboard(chat_id):
     lang = get_lang(chat_id)
-    return {
-        "keyboard": [
-            ["✅ Yes" if lang == "en" else "✅ হ্যাঁ", "❌ No" if lang == "en" else "❌ না"]
-        ],
-        "resize_keyboard": True
-    }
+    return {"keyboard": [["✅ Yes" if lang == "en" else "✅ হ্যাঁ", "❌ No" if lang == "en" else "❌ না"]], "resize_keyboard": True}
 
 def next_or_cancel_keyboard(chat_id):
     lang = get_lang(chat_id)
-    return {
-        "keyboard": [
-            ["🔄 Open Another Account" if lang == "en" else "🔄 আরেকটি অ্যাকাউন্ট খুলুন"],
-            ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
-        ],
-        "resize_keyboard": True
-    }
+    return {"keyboard": [["🔄 Open Another Account" if lang == "en" else "🔄 আরেকটি অ্যাকাউন্ট খুলুন"], ["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True}
 
 def withdraw_method_keyboard(chat_id):
     lang = get_lang(chat_id)
-    return {
-        "keyboard": [
-            ["💸 bKash", "💸 Nagad"],
-            ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
-        ],
-        "resize_keyboard": True
-    }
+    return {"keyboard": [["💸 bKash", "💸 Nagad"], ["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True}
 
 def work_start_keyboard(chat_id):
     lang = get_lang(chat_id)
-    return {
-        "keyboard": [
-            ["🚀 Start" if lang == "en" else "🚀 শুরু করুন"],
-            ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
-        ],
-        "resize_keyboard": True
-    }
+    return {"keyboard": [["🚀 Start" if lang == "en" else "🚀 শুরু করুন"], ["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True}
 
 def username_input_keyboard(chat_id):
     lang = get_lang(chat_id)
-    return {
-        "keyboard": [
-            ["👤 Enter Username" if lang == "en" else "👤 ইউজারনেম দিন"],
-            ["❌ Cancel" if lang == "en" else "❌ বাতিল"]
-        ],
-        "resize_keyboard": True
-    }
+    return {"keyboard": [["👤 Enter Username" if lang == "en" else "👤 ইউজারনেম দিন"], ["❌ Cancel" if lang == "en" else "❌ বাতিল"]], "resize_keyboard": True}
 
 # ================== CREDENTIALS MANAGEMENT ==================
 def get_available_credential():
@@ -998,11 +984,9 @@ def auto_backup_loop():
 
 # ================== VERSION MANAGEMENT ==================
 def generate_new_version():
-    """Bot start/restart হলে new version তৈরি হবে"""
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
 
 def check_and_update_version():
-    """Bot start হলে version auto-change করবে, সব ইউজারকে /start দিতে বাধ্য করবে"""
     current_version = config.get("bot_version", "0")
     new_version = generate_new_version()
     if current_version != new_version:
@@ -1011,6 +995,80 @@ def check_and_update_version():
         logger.info(f"Bot version updated to: {new_version}")
     else:
         logger.info("Version already up-to-date.")
+
+# ================== METHOD FUNCTIONS ==================
+def send_method_content(chat_id):
+    mtype = config.get("method_type", "text")
+    text = config.get("method_text", "")
+    video_id = config.get("method_video_file_id", "")
+    voice_id = config.get("method_voice_file_id", "")
+    
+    if mtype == "text":
+        if text:
+            send_message(t("method_content", chat_id, content=text), chat_id)
+        else:
+            send_message(t("no_method", chat_id), chat_id)
+    elif mtype == "video":
+        if video_id:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo"
+            requests.post(url, json={"chat_id": chat_id, "video": video_id})
+        else:
+            send_message(t("no_method", chat_id), chat_id)
+    elif mtype == "voice":
+        if voice_id:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendVoice"
+            requests.post(url, json={"chat_id": chat_id, "voice": voice_id})
+        else:
+            send_message(t("no_method", chat_id), chat_id)
+    elif mtype == "all":
+        if text:
+            send_message(t("method_content", chat_id, content=text), chat_id)
+        if video_id:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo"
+            requests.post(url, json={"chat_id": chat_id, "video": video_id})
+        if voice_id:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendVoice"
+            requests.post(url, json={"chat_id": chat_id, "voice": voice_id})
+        if not text and not video_id and not voice_id:
+            send_message(t("no_method", chat_id), chat_id)
+
+def admin_set_method_text(chat_id, text):
+    config["method_text"] = text
+    config["method_type"] = "text"
+    save_all()
+    send_message(t("method_set_text", chat_id), chat_id, reply_markup=admin_keyboard())
+
+def admin_prompt_method_video(chat_id):
+    set_session(chat_id, {"awaiting_method_video": True})
+    send_message("Send me the video file.", chat_id, reply_markup=cancel_keyboard(chat_id))
+
+def admin_prompt_method_voice(chat_id):
+    set_session(chat_id, {"awaiting_method_voice": True})
+    send_message("Send me the voice file.", chat_id, reply_markup=cancel_keyboard(chat_id))
+
+def admin_set_method_video(chat_id, file_id):
+    config["method_video_file_id"] = file_id
+    if config.get("method_type") not in ["all", "video"]:
+        config["method_type"] = "video"
+    save_all()
+    clear_session(chat_id)
+    send_message(t("method_set_video", chat_id), chat_id, reply_markup=admin_keyboard())
+
+def admin_set_method_voice(chat_id, file_id):
+    config["method_voice_file_id"] = file_id
+    if config.get("method_type") not in ["all", "voice"]:
+        config["method_type"] = "voice"
+    save_all()
+    clear_session(chat_id)
+    send_message(t("method_set_voice", chat_id), chat_id, reply_markup=admin_keyboard())
+
+def admin_set_method_type(chat_id, mtype):
+    if mtype not in ["text", "video", "voice", "all"]:
+        send_message("❌ Invalid type. Use: text, video, voice, all", chat_id)
+        return
+    config["method_type"] = mtype
+    save_all()
+    send_message(t("method_type_set", chat_id, type=mtype), chat_id, reply_markup=admin_keyboard())
 
 # ================== ADMIN FUNCTIONS ==================
 def admin_panel(chat_id):
@@ -1736,34 +1794,13 @@ def handle_updates():
         except Exception as e:
             logger.error(f"Update loop error: {e}")
         time.sleep(0.02)
-        
-def get_user_id_from_identifier(identifier):
-    """
-    identifier হতে পারে user_id (সাংখ্যিক) অথবা @username।
-    রিটার্ন: user_id (str) অথবা None
-    """
-    identifier = identifier.strip()
-    if identifier.isdigit():
-        return identifier
-    if identifier.startswith("@"):
-        uname = identifier[1:]  # @ সরান
-        # user_info-তে username খুঁজুন
-        for uid, info in user_info.items():
-            if info.get("username", "").lower() == uname.lower():
-                return uid
-    return None        
 
 def get_user_id_from_identifier(identifier):
-    """
-    identifier হতে পারে user_id (সাংখ্যিক) অথবা @username।
-    রিটার্ন: user_id (str) অথবা None
-    """
     identifier = identifier.strip()
     if identifier.isdigit():
         return identifier
     if identifier.startswith("@"):
-        uname = identifier[1:]  # @ সরান
-        # user_info-তে username খুঁজুন
+        uname = identifier[1:]
         for uid, info in user_info.items():
             if info.get("username", "").lower() == uname.lower():
                 return uid
@@ -1776,27 +1813,22 @@ def process_update(update):
         chat_type = msg["chat"]["type"]
         text = msg.get("text", "").strip()
 
-        # নতুন ইউজার হলে সাবস্ক্রাইব করুন
+        # Subscribe new users
         if chat_id not in subscribed_users:
             with data_lock:
                 subscribed_users.add(chat_id)
                 save_all()
 
-        # ===== ভার্সন চেক (সব ইউজারের জন্য) =====
+        # Version check
         uid = str(chat_id)
         if uid in user_info:
             user_version = user_info[uid].get("last_version", "0")
             current_version = config.get("bot_version", "0")
             if user_version != current_version and text != "/start":
                 lang = get_lang(chat_id)
-                msg_text = (
-                    "🔄 **Bot updated!** Please press /start to continue."
-                    if lang == "en" else
-                    "🔄 **বট আপডেট হয়েছে!** চালিয়ে যেতে /start চাপুন।"
-                )
+                msg_text = "🔄 **Bot updated!** Please press /start to continue." if lang == "en" else "🔄 **বট আপডেট হয়েছে!** চালিয়ে যেতে /start চাপুন।"
                 send_message(msg_text, chat_id)
                 return
-        # ===== ভার্সন চেক শেষ =====
 
         if text == "/start":
             uname = msg.get("from", {}).get("username")
@@ -1806,7 +1838,7 @@ def process_update(update):
         if chat_type != "private":
             return
 
-        # ইউজারনেম আপডেট (সব মেসেজে)
+        # Update username
         if "from" in msg and "username" in msg["from"]:
             uname = msg["from"]["username"]
             uid = str(chat_id)
@@ -1814,67 +1846,51 @@ def process_update(update):
                 user_info[uid]["username"] = uname
                 save_json(USER_INFO_FILE, user_info)
 
-        # ===== ADMIN SECTION =====
+        # Admin section
         if chat_id == ADMIN_CHAT_ID:
             session = get_session(chat_id)
-            # Handle restore mode
-            if session and session.get("restore_mode"):
-                if text == "❌ Cancel" or text == "❌ বাতিল":
-                    clear_session(chat_id)
-                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
-                    return
-                if "document" in msg:
-                    file_obj = msg["document"]
-                    if file_obj.get("file_name", "").endswith(".json.gz"):
-                        try:
-                            file_id = file_obj["file_id"]
-                            file_info = requests.get(
-                                f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
-                            ).json()
-                            file_path = file_info["result"]["file_path"]
-                            file_content = requests.get(
-                                f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
-                            ).content
-                            process_restore_file(chat_id, file_content)
-                        except Exception as e:
-                            logger.error(f"Restore file error: {e}")
-                            send_message("❌ Failed to read file.", chat_id)
-                    else:
-                        send_message("❌ Please upload a `.json.gz` file.", chat_id)
-                    return
 
-            # Handle upload list mode (approved/rejected)
-            if session and session.get("upload_mode") in ["approved", "rejected"]:
-                if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
+            # Restore mode
+            if session and session.get("restore_mode"):
+                if text in ["❌ Cancel", "❌ বাতিল"]:
                     clear_session(chat_id)
-                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                    send_message("Cancelled.", chat_id, reply_markup=admin_keyboard())
                     return
-                if "document" in msg:
-                    file_obj = msg["document"]
-                    if file_obj.get("mime_type") == "text/plain" or file_obj.get("file_name", "").endswith(".txt"):
-                        try:
-                            file_id = file_obj["file_id"]
-                            file_info = requests.get(
-                                f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
-                            ).json()
-                            file_path = file_info["result"]["file_path"]
-                            file_content = requests.get(
-                                f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
-                            ).text
-                            process_uploaded_list(chat_id, file_content)
-                        except Exception as e:
-                            logger.error(f"File read error: {e}")
-                            send_message("❌ Failed to read file. Please send a valid text file.", chat_id)
-                    else:
-                        send_message("❌ Please upload a .txt file or send the list as text.", chat_id)
+                if "document" in msg and msg["document"].get("file_name", "").endswith(".json.gz"):
+                    try:
+                        file_id = msg["document"]["file_id"]
+                        file_info = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}").json()
+                        file_path = file_info["result"]["file_path"]
+                        file_content = requests.get(f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}").content
+                        process_restore_file(chat_id, file_content)
+                    except:
+                        send_message("Failed to read file.", chat_id)
+                else:
+                    send_message("Please upload .json.gz file.", chat_id)
+                return
+
+            # Upload list mode
+            if session and session.get("upload_mode") in ["approved", "rejected"]:
+                if text in ["/cancel", "❌ Cancel", "❌ বাতিল"]:
+                    clear_session(chat_id)
+                    send_message("Cancelled.", chat_id, reply_markup=admin_keyboard())
                     return
+                if "document" in msg and (msg["document"].get("mime_type") == "text/plain" or msg["document"].get("file_name", "").endswith(".txt")):
+                    try:
+                        file_id = msg["document"]["file_id"]
+                        file_info = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}").json()
+                        file_path = file_info["result"]["file_path"]
+                        file_content = requests.get(f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}").text
+                        process_uploaded_list(chat_id, file_content)
+                    except:
+                        send_message("Failed to read file.", chat_id)
                 else:
                     process_uploaded_list(chat_id, text)
-                    return
+                return
 
-            # Handle broadcast mode
+            # Broadcast mode
             if session and session.get("broadcast_mode"):
-                if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
+                if text in ["/cancel", "❌ Cancel", "❌ বাতিল"]:
                     clear_session(chat_id)
                     send_message(t("broadcast_cancelled", chat_id), chat_id, reply_markup=admin_keyboard())
                     return
@@ -1887,11 +1903,25 @@ def process_update(update):
                 clear_session(chat_id)
                 return
 
-            # Admin normal commands
+            # Method awaiting sessions
+            if session and session.get("awaiting_method_video"):
+                if msg.get("video"):
+                    admin_set_method_video(chat_id, msg["video"]["file_id"])
+                else:
+                    send_message("Send a video file.", chat_id)
+                return
+            if session and session.get("awaiting_method_voice"):
+                if msg.get("voice"):
+                    admin_set_method_voice(chat_id, msg["voice"]["file_id"])
+                else:
+                    send_message("Send a voice file.", chat_id)
+                return
+
+            # Credentials upload session
             if chat_id in admin_cred_upload_session:
-                if text == "/cancel" or text == "❌ Cancel" or text == "❌ বাতিল":
+                if text in ["/cancel", "❌ Cancel", "❌ বাতিল"]:
                     del admin_cred_upload_session[chat_id]
-                    send_message("❌ Cancelled." if get_lang(chat_id) == "en" else "❌ বাতিল করা হয়েছে।", chat_id, reply_markup=admin_keyboard())
+                    send_message("Cancelled.", chat_id, reply_markup=admin_keyboard())
                     return
                 step = admin_cred_upload_session[chat_id].get("step")
                 if step == "email":
@@ -1900,6 +1930,7 @@ def process_update(update):
                     process_admin_creds_password(chat_id, text)
                 return
 
+            # Admin buttons
             if text == "⚙️ Admin Panel":
                 admin_panel(chat_id)
                 return
@@ -1960,7 +1991,11 @@ def process_update(update):
             if text == "📢 Broadcast":
                 admin_broadcast_prompt(chat_id)
                 return
+            if text == "📝 Set Method":
+                send_message(t("method_help", chat_id), chat_id, reply_markup=admin_keyboard())
+                return
 
+            # Admin commands
             if text.startswith("/setprice"):
                 admin_set_price(chat_id, text)
                 return
@@ -1980,34 +2015,29 @@ def process_update(update):
                 if len(parts) == 2:
                     admin_reject_withdraw(chat_id, parts[1])
                 return
-
-            # ===== নতুন /ban এবং /unban হ্যান্ডলার =====
             if text.startswith("/ban"):
                 parts = text.split(maxsplit=1)
                 if len(parts) == 2:
-                    identifier = parts[1]
-                    target_id = get_user_id_from_identifier(identifier)
+                    target_id = get_user_id_from_identifier(parts[1])
                     if target_id:
                         if target_id == str(ADMIN_CHAT_ID):
-                            send_message("❌ You cannot ban yourself.", chat_id)
-                            return
-                        manual_ban_user(target_id)
-                        send_message(t("ban_success", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
-                        try:
-                            send_message("You have been banned by admin.", target_id)
-                        except:
-                            pass
+                            send_message("You cannot ban yourself.", chat_id)
+                        else:
+                            manual_ban_user(target_id)
+                            send_message(t("ban_success", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
+                            try:
+                                send_message("You have been banned by admin.", target_id)
+                            except:
+                                pass
                     else:
-                        send_message("❌ User not found. Provide a valid user ID or @username.", chat_id)
+                        send_message("User not found.", chat_id)
                 else:
                     send_message("Usage: /ban <user_id or @username>", chat_id)
                 return
-
             if text.startswith("/unban"):
                 parts = text.split(maxsplit=1)
                 if len(parts) == 2:
-                    identifier = parts[1]
-                    target_id = get_user_id_from_identifier(identifier)
+                    target_id = get_user_id_from_identifier(parts[1])
                     if target_id:
                         unban_user(target_id)
                         send_message(t("unban_success", chat_id, user_id=target_id), chat_id, reply_markup=admin_keyboard())
@@ -2016,26 +2046,43 @@ def process_update(update):
                         except:
                             pass
                     else:
-                        send_message("❌ User not found. Provide a valid user ID or @username.", chat_id)
+                        send_message("User not found.", chat_id)
                 else:
                     send_message("Usage: /unban <user_id or @username>", chat_id)
                 return
-            # ===== /ban ও /unban হ্যান্ডলার শেষ =====
+            if text.startswith("/setmethodtext"):
+                parts = text.split(maxsplit=1)
+                if len(parts) == 2:
+                    admin_set_method_text(chat_id, parts[1])
+                else:
+                    send_message("Usage: /setmethodtext <text>", chat_id)
+                return
+            if text.startswith("/setmethodvideo"):
+                admin_prompt_method_video(chat_id)
+                return
+            if text.startswith("/setmethodvoice"):
+                admin_prompt_method_voice(chat_id)
+                return
+            if text.startswith("/setmethodtype"):
+                parts = text.split()
+                if len(parts) == 2:
+                    admin_set_method_type(chat_id, parts[1])
+                else:
+                    send_message("Usage: /setmethodtype <text|video|voice|all>", chat_id)
+                return
 
-        # ===== USER SECTION =====
+        # User section
         session = get_session(chat_id)
 
         if text == "🌐 Language":
             change_language(chat_id)
             return
-
         if text in ["❌ Cancel", "❌ বাতিল"]:
             if session and session.get("active"):
                 record_cancel(chat_id)
             clear_session(chat_id)
             send_message(t("cancelled", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
             return
-
         if text == "📱 Instagram Work":
             instagram_work(chat_id)
             return
@@ -2069,6 +2116,9 @@ def process_update(update):
             return
         if text == "📞 Support":
             send_message(t("support_message", chat_id), chat_id)
+            return
+        if text == "📘 Method":
+            send_method_content(chat_id)
             return
 
         if session:
@@ -2107,9 +2157,7 @@ def process_update(update):
             admin_delete_single_cred(chat_id, index, message_id)
         elif data == "close_list":
             delete_message(chat_id, message_id)
-            lang = get_lang(chat_id)
-            msg = "📋 List closed." if lang == "en" else "📋 তালিকা বন্ধ করা হয়েছে।"
-            send_message(msg, chat_id, reply_markup=admin_keyboard())
+            send_message("Closed.", chat_id, reply_markup=admin_keyboard())
         elif data.startswith("appw_"):
             w_id = data[5:]
             admin_approve_withdraw(chat_id, w_id)
@@ -2123,17 +2171,13 @@ def process_update(update):
             admin_show_withdraw_requests(chat_id, page=page, message_id=message_id)
         elif data == "close_withdraw":
             delete_message(chat_id, message_id)
-            lang = get_lang(chat_id)
-            msg = "📋 Withdraw list closed." if lang == "en" else "📋 উইথড্র তালিকা বন্ধ করা হয়েছে।"
-            send_message(msg, chat_id, reply_markup=admin_keyboard())
+            send_message("Closed.", chat_id, reply_markup=admin_keyboard())
         elif data.startswith("papage_"):
             page = int(data.split("_")[1])
             admin_show_pending_approvals(chat_id, page=page, message_id=message_id)
         elif data == "close_papprovals":
             delete_message(chat_id, message_id)
-            lang = get_lang(chat_id)
-            msg = "📋 Pending approvals list closed." if lang == "en" else "📋 পেন্ডিং অ্যাপ্রুভাল তালিকা বন্ধ করা হয়েছে।"
-            send_message(msg, chat_id, reply_markup=admin_keyboard())
+            send_message("Closed.", chat_id, reply_markup=admin_keyboard())
         elif data.startswith("myacc_"):
             page = int(data.split("_")[1])
             show_my_accounts(chat_id, page=page, message_id=message_id)
@@ -2172,7 +2216,7 @@ def process_update(update):
                 pass
             delete_message(chat_id, message_id)
             admin_show_banned_users(chat_id)
-            
+
 # ================== FLASK ==================
 @app.route("/")
 def home():
