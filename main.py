@@ -1495,9 +1495,11 @@ def admin_show_user_list(chat_id, page=0, message_id=None):
     for uid in page_users:
         banned, _ = is_banned(uid)
         if not banned:
-            kb["inline_keyboard"].append([{"text": f"🔨 Ban {uid}", "callback_data": f"banuser_{uid}"}])
+            # ব্যানড না হলে ব্যান বাটন দেখাও
+            kb["inline_keyboard"].append([{"text": f"🔨 Ban {uid}", "callback_data": f"banuser_{uid}_{page}"}])
         else:
-            kb["inline_keyboard"].append([{"text": f"✅ Unban {uid}", "callback_data": f"unbanuser_{uid}"}])
+            # ব্যানড হলে আনব্যান বাটন দেখাও (callback_data আলাদা)
+            kb["inline_keyboard"].append([{"text": f"✅ Unban {uid}", "callback_data": f"unban_from_userlist_{uid}_{page}"}])
     kb["inline_keyboard"].append([{"text": "🔙 Close", "callback_data": "close_userlist"}])
     if message_id:
         edit_message_text(chat_id, message_id, text, reply_markup=kb)
@@ -1539,7 +1541,7 @@ def admin_show_banned_users(chat_id, page=0, message_id=None):
     if nav:
         kb["inline_keyboard"].append(nav)
     for uid in page_users:
-        kb["inline_keyboard"].append([{"text": f"✅ Unban {uid}", "callback_data": f"unbanuser_{uid}"}])
+        kb["inline_keyboard"].append([{"text": f"✅ Unban {uid}", "callback_data": f"unban_from_banned_{uid}_{page}"}])
     kb["inline_keyboard"].append([{"text": "🔙 Close", "callback_data": "close_banlist"}])
     if message_id:
         edit_message_text(chat_id, message_id, text, reply_markup=kb)
@@ -2196,26 +2198,49 @@ def process_update(update):
         elif data == "close_banlist":
             delete_message(chat_id, message_id)
             send_message("Closed.", chat_id, reply_markup=admin_keyboard())
+
+        # ব্যান/আনব্যান কলব্যাক (page সহ)
         elif data.startswith("banuser_"):
-            uid = data.split("_",1)[1]
+            # ফরম্যাট: banuser_{uid}_{page}
+            parts = data.split("_")
+            uid = parts[1]
+            page = int(parts[2]) if len(parts) > 2 else 0
             manual_ban_user(uid)
             send_message(t("ban_success", chat_id, user_id=uid), chat_id)
             try:
                 send_message("You have been banned by admin.", uid)
             except:
                 pass
-            delete_message(chat_id, message_id)
-            admin_show_user_list(chat_id)
-        elif data.startswith("unbanuser_"):
-            uid = data.split("_",1)[1]
+            # একই মেসেজে ইউজার লিস্ট আপডেট
+            admin_show_user_list(chat_id, page=page, message_id=message_id)
+
+        elif data.startswith("unban_from_userlist_"):
+            # ফরম্যাট: unban_from_userlist_{uid}_{page}
+            parts = data.split("_")
+            uid = parts[1]
+            page = int(parts[2]) if len(parts) > 2 else 0
             unban_user(uid)
             send_message(t("unban_success", chat_id, user_id=uid), chat_id)
             try:
                 send_message("You have been unbanned by admin.", uid)
             except:
                 pass
-            delete_message(chat_id, message_id)
-            admin_show_banned_users(chat_id)
+            # একই মেসেজে ইউজার লিস্ট আপডেট
+            admin_show_user_list(chat_id, page=page, message_id=message_id)
+
+        elif data.startswith("unban_from_banned_"):
+            # ফরম্যাট: unban_from_banned_{uid}_{page}
+            parts = data.split("_")
+            uid = parts[1]
+            page = int(parts[2]) if len(parts) > 2 else 0
+            unban_user(uid)
+            send_message(t("unban_success", chat_id, user_id=uid), chat_id)
+            try:
+                send_message("You have been unbanned by admin.", uid)
+            except:
+                pass
+            # একই মেসেজে ব্যানড ইউজার লিস্ট আপডেট
+            admin_show_banned_users(chat_id, page=page, message_id=message_id)
 
 # ================== FLASK ==================
 @app.route("/")
