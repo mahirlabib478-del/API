@@ -45,6 +45,7 @@ config = {
     "base_balance": 10.0,
     "channel_id": CHANNEL_ID,
     "maintenance_mode": False,
+    "submit_lock": False, 
     "bot_version": "0",
     "method_text": "",
     "method_video_file_id": "",
@@ -212,6 +213,9 @@ def t(key, user_id, **kwargs):
             "welcome": "🤖 **Instagram Account Opener Bot**\n\nI help you open Instagram accounts.\nUse the buttons below to start.",
             "balance": "💰 **Your Balance**\n\nBalance: `{balance:.2f}` BDT\nTotal Accounts Opened: {total}",
             "withdraw": "💸 **Withdraw**\n\nChoose your withdrawal method:",
+            "submit_locked": "🔒 Account opening is currently locked by admin. Please try again later.",
+            "submit_unlocked": "🔓 Account opening is now unlocked.",
+            "submit_lock_toggle": "🔒 Submit Lock",
             "enter_account": "📞 Enter your {method} account number:",
             "enter_amount": "💰 **Enter the amount** you want to withdraw:",
             "withdraw_submitted": "✅ **Withdraw request submitted!**\n🆔 **ID:** `{w_id}`\n💰 **Amount:** {amount} BDT\n📌 Status: ⏳ Pending",
@@ -295,6 +299,9 @@ def t(key, user_id, **kwargs):
             "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
             "balance": "💰 **আপনার ব্যালেন্স**\n\nব্যালেন্স: `{balance:.2f}` টাকা\nমোট অ্যাকাউন্ট খোলা: {total}",
             "withdraw": "💸 **উইথড্র করুন**\n\nআপনার টাকা উত্তোলনের মাধ্যম নির্বাচন করুন:",
+            "submit_locked": "🔒 অ্যাকাউন্ট খোলা বর্তমানে অ্যাডমিন কর্তৃক লক করা আছে। পরে আবার চেষ্টা করুন।",
+            "submit_unlocked": "🔓 অ্যাকাউন্ট খোলা এখন আনলক করা হয়েছে।",
+            "submit_lock_toggle": "🔒 সাবমিট লক",
             "enter_account": "📞 আপনার {method} অ্যাকাউন্ট নম্বর দিন:",
             "enter_amount": "💰 **কত টাকা উইথড্র করতে চান?**",
             "withdraw_submitted": "✅ **উইথড্র রিকোয়েস্ট জমা হয়েছে!**\n🆔 **আইডি:** `{w_id}`\n💰 **পরিমাণ:** {amount} টাকা\n📌 স্ট্যাটাস: ⏳ পেন্ডিং",
@@ -481,9 +488,11 @@ def admin_keyboard():
             ["📥 Restore", f"🔧 Maintenance {maint_status}"],
             ["📋 Pending Approvals", "📥 Export Excel"],
             ["📤 Upload Approved", "📤 Upload Rejected"],
-            ["🗑️ Clear Exported Accounts", "🔙 Main Menu"],
+            ["🗑️ Clear Exported Accounts"],
+            [f"🔒 Submit Lock: {submit_lock_status}"],
             ["👥 User List", "🚫 Banned Users"],
-            ["📢 Broadcast", "📝 Set Method"]
+            ["📢 Broadcast", "📝 Set Method"],
+            ["🔙 Main Menu"]
         ],
         "resize_keyboard": True
     }
@@ -1303,7 +1312,16 @@ def admin_toggle_maintenance(chat_id):
     lang = get_lang(chat_id)
     msg = f"🔧 **Maintenance mode {status}.**" if lang == "en" else f"🔧 **রক্ষণাবেক্ষণ মোড { 'চালু' if config['maintenance_mode'] else 'বন্ধ'}।**"
     send_message(msg, chat_id, reply_markup=admin_keyboard())
-
+    
+def admin_toggle_submit_lock(chat_id):
+    current = config.get("submit_lock", False)
+    config["submit_lock"] = not current
+    save_all()
+    if config["submit_lock"]:
+        send_message(t("submit_locked", chat_id), chat_id, reply_markup=admin_keyboard())
+    else:
+        send_message(t("submit_unlocked", chat_id), chat_id, reply_markup=admin_keyboard())
+        
 def admin_backup(chat_id):
     send_message(t("backup_creating", chat_id), chat_id)
     success = manual_backup(chat_id)
@@ -1590,6 +1608,9 @@ def instagram_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
         send_message(t("under_maintenance", chat_id), chat_id)
         return
+    if config.get("submit_lock", False) and str(chat_id) != ADMIN_CHAT_ID:
+        send_message(t("submit_locked", chat_id), chat_id)
+        return    
     banned, _ = is_banned(chat_id)
     if banned:
         remaining = get_ban_remaining(chat_id)
@@ -1611,6 +1632,9 @@ def start_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
         send_message(t("under_maintenance", chat_id), chat_id)
         return
+    if config.get("submit_lock", False) and str(chat_id) != ADMIN_CHAT_ID:
+        send_message(t("submit_locked", chat_id), chat_id)
+        return    
     banned, _ = is_banned(chat_id)
     if banned:
         remaining = get_ban_remaining(chat_id)
@@ -1997,6 +2021,9 @@ def process_update(update):
             if text == "📝 Set Method":
                 send_message(t("method_help", chat_id), chat_id, reply_markup=admin_keyboard())
                 return
+            if text.startswith("🔒 Submit Lock:") or text.startswith("🔓 Submit Lock:"):
+                admin_toggle_submit_lock(chat_id)
+                return    
 
             # অ্যাডমিন কমান্ড
             if text.startswith("/setprice"):
