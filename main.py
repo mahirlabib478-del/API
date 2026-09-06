@@ -479,6 +479,7 @@ def main_keyboard(chat_id):
 
 def admin_keyboard():
     maint_status = "🟢 ON" if config.get("maintenance_mode", False) else "🔴 OFF"
+    submit_lock_status = "🔒 ON" if config.get("submit_lock", False) else "🔓 OFF"  
     return {
         "keyboard": [
             ["➕ Add Accounts", "📋 Account List"],
