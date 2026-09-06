@@ -294,6 +294,7 @@ def t(key, user_id, **kwargs):
             "method_set_voice": "✅ Method voice saved.",
             "method_type_set": "✅ Method type set to {type}.",
             "method_help": "Commands:\n/setmethodtext <text>\n/setmethodvideo (then send video)\n/setmethodvoice (then send voice)\n/setmethodtype <text|video|voice|all>",
+            "unsubscribed": "❌ You have been unsubscribed. Press /start to subscribe again.",
         },
         "bn": {
             "welcome": "🤖 **Instagram অ্যাকাউন্ট খোলার বট**\n\nআমি আপনাকে ইনস্টাগ্রাম অ্যাকাউন্ট খুলতে সাহায্য করি।\nনিচের বাটন ব্যবহার করে শুরু করুন।",
@@ -380,6 +381,7 @@ def t(key, user_id, **kwargs):
             "method_set_voice": "✅ পদ্ধতির ভয়েস সংরক্ষিত হয়েছে।",
             "method_type_set": "✅ পদ্ধতির ধরন {type} সেট হয়েছে।",
             "method_help": "কমান্ডসমূহ:\n/setmethodtext <text>\n/setmethodvideo (তারপর ভিডিও পাঠান)\n/setmethodvoice (তারপর ভয়েস পাঠান)\n/setmethodtype <text|video|voice|all>",
+            "unsubscribed": "❌ আপনি আনসাবস্ক্রাইব করেছেন। আবার সাবস্ক্রাইব করতে /start চাপুন।", 
         }
     }
     text = translations.get(lang, translations["en"]).get(key, key)
@@ -1605,6 +1607,16 @@ def change_language(chat_id):
     set_lang(chat_id, new_lang)
     send_message(t("language_changed", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
 
+def unsubscribe_user(chat_id):
+    uid = str(chat_id)
+    with data_lock:
+        if uid in subscribed_users:
+            subscribed_users.discard(uid)
+        # চলমান সেশন থাকলে মুছে দিন
+        if uid in user_sessions:
+            del user_sessions[uid]
+        save_all()
+
 def instagram_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
         send_message(t("under_maintenance", chat_id), chat_id)
@@ -1837,11 +1849,7 @@ def process_update(update):
         chat_type = msg["chat"]["type"]
         text = msg.get("text", "").strip()
 
-        # নতুন ইউজার সাবস্ক্রাইব
-        if chat_id not in subscribed_users:
-            with data_lock:
-                subscribed_users.add(chat_id)
-                save_all()
+        
 
         # ভার্সন চেক
         uid = str(chat_id)
@@ -2150,6 +2158,11 @@ def process_update(update):
             return
         if text == "📘 Method":
             send_method_content(chat_id)
+            return
+
+        if text == "/unsubscribe":
+            unsubscribe_user(chat_id)
+            send_message(t("unsubscribed", chat_id), chat_id, reply_markup=main_keyboard(chat_id))
             return
 
         if session:
