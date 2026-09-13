@@ -562,7 +562,8 @@ def get_available_credential():
             if not cred.get("used", False):
                 cred["used"] = True
                 cred["assigned_to"] = None
-                save_all()
+                save_credentials()
+                trigger_backup()
                 return cred
     return None
 
@@ -571,7 +572,8 @@ def assign_credential_to_user(cred, user_id):
         for c in credentials:
             if c["email"] == cred["email"] and c["password"] == cred["password"]:
                 c["assigned_to"] = str(user_id)
-                save_all()
+                save_credentials()
+                trigger_backup()
                 return True
     return False
 
@@ -580,6 +582,8 @@ def delete_credential_by_index(index):
         if 0 <= index < len(credentials):
             deleted = credentials.pop(index)
             save_all()
+            save_credentials()
+            trigger_backup()
             return deleted
     return None
 
@@ -753,11 +757,12 @@ def get_session(chat_id):
 
 def set_session(chat_id, data):
     user_sessions[str(chat_id)] = data
-    save_all()
-
+    save_sessions()
+    trigger_backup()
 def clear_session(chat_id):
     user_sessions.pop(str(chat_id), None)
-    save_all()
+    save_sessions()
+    trigger_backup()
 
 # ================== BACKUP SYSTEM ==================
 MAX_PART_SIZE = 45 * 1024 * 1024
@@ -1078,7 +1083,8 @@ def send_method_content(chat_id):
 def admin_set_method_text(chat_id, text):
     config["method_text"] = text
     config["method_type"] = "text"
-    save_all()
+    save_config()
+    trigger_backup()
     send_message(t("method_set_text", chat_id), chat_id, reply_markup=admin_keyboard())
 
 def admin_prompt_method_video(chat_id):
@@ -1093,7 +1099,8 @@ def admin_set_method_video(chat_id, file_id):
     config["method_video_file_id"] = file_id
     if config.get("method_type") not in ["all", "video"]:
         config["method_type"] = "video"
-    save_all()
+    save_config()
+    trigger_backup()
     clear_session(chat_id)
     send_message(t("method_set_video", chat_id), chat_id, reply_markup=admin_keyboard())
 
@@ -1101,7 +1108,8 @@ def admin_set_method_voice(chat_id, file_id):
     config["method_voice_file_id"] = file_id
     if config.get("method_type") not in ["all", "voice"]:
         config["method_type"] = "voice"
-    save_all()
+    save_config()
+    trigger_backup()
     clear_session(chat_id)
     send_message(t("method_set_voice", chat_id), chat_id, reply_markup=admin_keyboard())
 
@@ -1110,7 +1118,8 @@ def admin_set_method_type(chat_id, mtype):
         send_message("❌ Invalid type. Use: text, video, voice, all", chat_id)
         return
     config["method_type"] = mtype
-    save_all()
+    save_config()
+    trigger_backup()
     send_message(t("method_type_set", chat_id, type=mtype), chat_id, reply_markup=admin_keyboard())
 
 # ================== ADMIN FUNCTIONS ==================
@@ -1151,7 +1160,8 @@ def process_admin_creds_password(chat_id, text):
         for email in emails:
             credentials.append({"email": email, "password": password, "used": False, "assigned_to": None})
             added += 1
-        save_all()
+        save_credentials()
+        trigger_backup()
     del admin_cred_upload_session[chat_id]
     send_message(t("add_accounts_success", chat_id, added=added, total=len(credentials)), chat_id, reply_markup=admin_keyboard())
     return True
@@ -1211,7 +1221,8 @@ def admin_delete_all_creds(chat_id):
     with data_lock:
         count = len(credentials)
         credentials.clear()
-        save_all()
+        save_credentials()
+        trigger_backup()
     send_message(t("deleted_all", chat_id, count=count), chat_id, reply_markup=admin_keyboard())
 
 def admin_stats(chat_id):
@@ -1277,7 +1288,8 @@ def admin_approve_withdraw(chat_id, w_id):
         for w in withdraw_requests:
             if w["id"] == w_id and w["status"] == "pending":
                 w["status"] = "approved"
-                save_all()
+                save_withdraws()
+                trigger_backup()
                 send_message(t("approve_success", chat_id, w_id=w_id), chat_id, reply_markup=admin_keyboard())
                 send_message(
                     f"✅ Your withdraw of **{w['amount']}** BDT has been approved.",
@@ -1292,7 +1304,8 @@ def admin_reject_withdraw(chat_id, w_id):
             if w["id"] == w_id and w["status"] == "pending":
                 w["status"] = "rejected"
                 add_balance(w["user_id"], w["amount"])
-                save_all()
+                save_withdraws()
+                trigger_backup()
                 send_message(t("reject_success", chat_id, w_id=w_id), chat_id, reply_markup=admin_keyboard())
                 send_message(
                     f"❌ Your withdraw request was rejected. **{w['amount']}** BDT has been refunded.",
@@ -1311,7 +1324,8 @@ def admin_set_price(chat_id, text):
         if price <= 0:
             raise ValueError
         config["base_balance"] = price
-        save_all()
+        save_config()
+        trigger_backup()
         send_message(t("price_set", chat_id, price=price), chat_id, reply_markup=admin_keyboard())
     except:
         send_message("❌ Invalid amount.", chat_id)
@@ -1326,7 +1340,8 @@ def admin_set_rules(chat_id, text):
         config["work_rules_bn"] = parts[1]
     else:
         config["work_rules_en"] = parts[1]
-    save_all()
+    save_config()
+    trigger_backup()
     send_message(t("rules_updated", chat_id), chat_id, reply_markup=admin_keyboard())
 
 def admin_set_channel(chat_id, text):
@@ -1335,13 +1350,15 @@ def admin_set_channel(chat_id, text):
         send_message("❌ **Usage:** `/setchannel <channel_id>`", chat_id)
         return
     config["channel_id"] = parts[1]
-    save_all()
+    save_config()
+    trigger_backup()
     send_message(t("channel_set", chat_id, channel=parts[1]), chat_id, reply_markup=admin_keyboard())
 
 def admin_toggle_maintenance(chat_id):
     current = config.get("maintenance_mode", False)
     config["maintenance_mode"] = not current
-    save_all()
+    save_config()
+    trigger_backup()
     status = "enabled" if config["maintenance_mode"] else "disabled"
     lang = get_lang(chat_id)
     msg = f"🔧 **Maintenance mode {status}.**" if lang == "en" else f"🔧 **রক্ষণাবেক্ষণ মোড { 'চালু' if config['maintenance_mode'] else 'বন্ধ'}।**"
@@ -1350,7 +1367,8 @@ def admin_toggle_maintenance(chat_id):
 def admin_toggle_submit_lock(chat_id):
     current = config.get("submit_lock", False)
     config["submit_lock"] = not current
-    save_all()
+    save_config()
+    trigger_backup()
     if config["submit_lock"]:
         send_message(t("submit_locked", chat_id), chat_id, reply_markup=admin_keyboard())
     else:
@@ -1607,7 +1625,8 @@ def start_command(chat_id, chat_type="private", username=None):
     if chat_id not in subscribed_users:
         with data_lock:
             subscribed_users.add(chat_id)
-            save_all()
+            save_users()
+            trigger_backup()
     uid = str(chat_id)
     if uid not in user_info:
         user_info[uid] = {
@@ -1647,6 +1666,8 @@ def unsubscribe_user(chat_id):
         if uid in user_sessions:
             del user_sessions[uid]
         save_all()
+        save_sessions()
+        trigger_backup()
 
 def instagram_work(chat_id):
     if config.get("maintenance_mode", False) and str(chat_id) != ADMIN_CHAT_ID:
@@ -1812,32 +1833,120 @@ def process_withdraw_amount(chat_id, text):
     session = get_session(chat_id)
     if not session or session.get("withdraw_step") != "amount":
         return False
+
+    # Validate withdrawal amount
     try:
-        amount = float(text.strip())
+        amount = float(str(text).strip())
+
         if not math.isfinite(amount) or amount <= 0:
             raise ValueError
-    except:
+
+        # Keep money value to 2 decimal places
+        amount = round(amount, 2)
+
+        if amount <= 0:
+            raise ValueError
+
+    except (ValueError, TypeError):
         send_message(t("invalid_amount", chat_id), chat_id)
         return False
-    uid = str(chat_id)
-    if user_balances.get(uid, 0.0) < amount:
-        send_message(t("insufficient", chat_id), chat_id)
+
+    # Validate required withdrawal session data
+    method = session.get("method")
+    account = session.get("account")
+
+    if not method or not account:
+        send_message(t("unknown", chat_id), chat_id)
         return False
-    w_id = uuid.uuid4().hex[:10]
-    withdraw_requests.append({
-        "id": w_id, "user_id": chat_id, "amount": amount,
-        "method": session["method"], "account": session["account"],
-        "status": "pending", "timestamp": time.time()
-    })
-    deduct_balance(chat_id, amount)
-    save_all()
-    send_message(t("withdraw_submitted", chat_id, w_id=w_id, amount=amount), chat_id, reply_markup=main_keyboard(chat_id))
+
+    uid = str(chat_id)
+
+    # Balance check, deduction and withdrawal creation
+    # are done under the same lock so two withdrawals
+    # cannot spend the same balance.
+    with data_lock:
+        current_balance = user_balances.get(uid, 0.0)
+
+        # Protect against corrupted balance values
+        try:
+            current_balance = float(current_balance)
+        except (ValueError, TypeError):
+            current_balance = 0.0
+
+        if not math.isfinite(current_balance) or current_balance < 0:
+            current_balance = 0.0
+
+        # Final balance check
+        if current_balance < amount:
+            send_message(t("insufficient", chat_id), chat_id)
+            return False
+
+        # Generate withdrawal ID
+        w_id = uuid.uuid4().hex[:10]
+
+        # Deduct balance first
+        new_balance = round(current_balance - amount, 2)
+        user_balances[uid] = new_balance
+
+        # Create withdrawal request only after successful balance calculation
+        withdrawal = {
+            "id": w_id,
+            "user_id": chat_id,
+            "amount": amount,
+            "method": method,
+            "account": account,
+            "status": "pending",
+            "timestamp": time.time()
+        }
+
+        withdraw_requests.append(withdrawal)
+
+        # Persist both changed data sets
+        save_json(USER_BALANCES_FILE, user_balances)
+        save_json(WITHDRAWS_FILE, withdraw_requests)
+
+    # Trigger one debounced backup after both changes are saved
+    trigger_backup()
+
+    # Notify user
+    send_message(
+        t(
+            "withdraw_submitted",
+            chat_id,
+            w_id=w_id,
+            amount=amount
+        ),
+        chat_id,
+        reply_markup=main_keyboard(chat_id)
+    )
+
+    # Notify admin
     lang = get_lang(chat_id)
-    admin_msg = f"📥 **New Withdraw Request**\n🆔 `{w_id}`\n👤 User: `{chat_id}`\n💰 {amount} BDT\n💳 {session['method'].upper()}\n📞 {session['account']}"
+
     if lang == "bn":
-        admin_msg = f"📥 **নতুন উইথড্র রিকোয়েস্ট**\n🆔 `{w_id}`\n👤 ইউজার: `{chat_id}`\n💰 {amount} টাকা\n💳 {session['method'].upper()}\n📞 {session['account']}"
+        admin_msg = (
+            f"📥 **নতুন উইথড্র রিকোয়েস্ট**\n"
+            f"🆔 `{w_id}`\n"
+            f"👤 ইউজার: `{chat_id}`\n"
+            f"💰 {amount:.2f} টাকা\n"
+            f"💳 {str(method).upper()}\n"
+            f"📞 `{account}`"
+        )
+    else:
+        admin_msg = (
+            f"📥 **New Withdraw Request**\n"
+            f"🆔 `{w_id}`\n"
+            f"👤 User: `{chat_id}`\n"
+            f"💰 {amount:.2f} BDT\n"
+            f"💳 {str(method).upper()}\n"
+            f"📞 `{account}`"
+        )
+
     send_message(admin_msg, ADMIN_CHAT_ID)
+
+    # Clear withdrawal session
     clear_session(chat_id)
+
     return True
 
 # ================== UPDATE HANDLER ==================
