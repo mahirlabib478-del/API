@@ -118,18 +118,48 @@ def load_all():
     if not config.get("channel_id"):
         config["channel_id"] = CHANNEL_ID
         save_json(CONFIG_FILE, config)
+def save_users():
+    save_json(USERS_FILE, list(subscribed_users))
+
+def save_sessions():
+    save_json(SESSIONS_FILE, user_sessions)
+
+def save_credentials():
+    save_json(CREDENTIALS_FILE, credentials)
+
+def save_withdraws():
+    save_json(WITHDRAWS_FILE, withdraw_requests)
+
+def save_created_accounts():
+    save_json(CREATED_ACCOUNTS_FILE, created_accounts)
+
+def save_config():
+    save_json(CONFIG_FILE, config)
+
+def save_balances():
+    save_json(USER_BALANCES_FILE, user_balances)
+
+def save_user_info():
+    save_json(USER_INFO_FILE, user_info)
+
+def save_language():
+    save_json(LANGUAGE_FILE, user_language)
+
+def save_cancel_tracking():
+    save_json(CANCEL_TRACKING_FILE, cancel_tracking)
+
 
 def save_all():
-    save_json(USERS_FILE, list(subscribed_users))
-    save_json(SESSIONS_FILE, user_sessions)
-    save_json(CREDENTIALS_FILE, credentials)
-    save_json(WITHDRAWS_FILE, withdraw_requests)
-    save_json(CREATED_ACCOUNTS_FILE, created_accounts)
-    save_json(CONFIG_FILE, config)
-    save_json(USER_BALANCES_FILE, user_balances)
-    save_json(USER_INFO_FILE, user_info)
-    save_json(LANGUAGE_FILE, user_language)
-    save_json(CANCEL_TRACKING_FILE, cancel_tracking)
+    save_users()
+    save_sessions()
+    save_credentials()
+    save_withdraws()
+    save_created_accounts()
+    save_config()
+    save_balances()
+    save_user_info()
+    save_language()
+    save_cancel_tracking()
     trigger_backup()
 
 # ================== DEBOUNCED BACKUP ==================
