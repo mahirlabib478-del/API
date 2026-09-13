@@ -581,7 +581,6 @@ def delete_credential_by_index(index):
     with data_lock:
         if 0 <= index < len(credentials):
             deleted = credentials.pop(index)
-            save_all()
             save_credentials()
             trigger_backup()
             return deleted
@@ -1665,7 +1664,7 @@ def unsubscribe_user(chat_id):
         # চলমান সেশন থাকলে মুছে দিন
         if uid in user_sessions:
             del user_sessions[uid]
-        save_all()
+        save_users()
         save_sessions()
         trigger_backup()
 
