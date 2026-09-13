@@ -1988,30 +1988,33 @@ def process_update(update):
         chat_type = msg["chat"]["type"]
         text = msg.get("text", "").strip()
 
-        
+        # শুধু private chat process করবে
+        if chat_type != "private":
+            return
 
-        # ভার্সন চেক
-        uid = str(chat_id)
-        if uid in user_info:
-            user_version = user_info[uid].get("last_version", "0")
-            current_version = config.get("bot_version", "0")
-            if user_version != current_version and text != "/start":
-                lang = get_lang(chat_id)
-                msg_text = (
-                    "🔄 **Bot updated!** Please press /start to continue."
-                    if lang == "en" else
-                    "🔄 **বট আপডেট হয়েছে!** চালিয়ে যেতে /start চাপুন।"
-                )
-                send_message(msg_text, chat_id)
-                return
-
+        # /start
         if text == "/start":
             uname = msg.get("from", {}).get("username")
             start_command(chat_id, chat_type, username=uname)
             return
 
-        if chat_type != "private":
-            return
+        # ভার্সন চেক — শুধু private user-এর জন্য
+        uid = str(chat_id)
+        if uid in user_info:
+            user_version = user_info[uid].get("last_version", "0")
+            current_version = config.get("bot_version", "0")
+
+            if user_version != current_version:
+                lang = get_lang(chat_id)
+
+                msg_text = (
+                    "🔄 **Bot updated!** Please press /start to continue."
+                    if lang == "en" else
+                    "🔄 **বট আপডেট হয়েছে!** চালিয়ে যেতে /start চাপুন।"
+                )
+
+                send_message(msg_text, chat_id)
+                return
 
         # ইউজারনেম আপডেট
         if "from" in msg and "username" in msg["from"]:
