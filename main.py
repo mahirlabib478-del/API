@@ -7,6 +7,7 @@ import uuid
 import gzip
 import requests
 import pyotp
+import math
 from flask import Flask
 from datetime import datetime
 import openpyxl
@@ -1783,7 +1784,7 @@ def process_withdraw_amount(chat_id, text):
         return False
     try:
         amount = float(text.strip())
-        if amount <= 0:
+        if not math.isfinite(amount) or amount <= 0:
             raise ValueError
     except:
         send_message(t("invalid_amount", chat_id), chat_id)
